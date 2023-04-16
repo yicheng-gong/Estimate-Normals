@@ -4,3 +4,4 @@ training_result/
 python/build/
 python/NormalEstimatorHoughCNN.cpp
 python/NormalEstimatorHoughCNN.cpython-310-x86_64-linux-gnu.so
+test_result/

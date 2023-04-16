@@ -22,62 +22,99 @@ import numpy as np
 from tqdm import *
 import torch
 from torch.autograd import Variable
+import os
 
-K = 100
-scale_number = 3
-batch_size = 512
-USE_CUDA = True
-input_filename = "test/cube_100k.xyz"
-output_filename = "out.xyz"
 
-# create thestimator
-estimator = Estimator.NormalEstimatorHoughCNN()
+def load_model(K,scale_number):
+    Ks = None
+    model = None
+    model_file_name = "state_dict.pth"
+    mean_file_name = "dataset_mean.npz"
+    if scale_number == 1:
+        Ks=np.array([K], dtype=np.int)
+        import models.model_1s as model_1s
+        traning_result_path = "training_result/model_1s"
+        model = model_1s.load_model(os.path.join(traning_result_path, model_file_name))
+        mean = np.load(os.path.join(traning_result_path, mean_file_name))["arr_0"]
+    elif scale_number == 3:
+        Ks=np.array([K,K/2,K*2], dtype=np.int)
+        import models.model_3s as model_3s
+        traning_result_path = "training_result/model_2s"
+        model = model_3s.load_model(os.path.join(traning_result_path, model_file_name))
+        mean = np.load(os.path.join(traning_result_path, mean_file_name))["arr_0"]
+    elif scale_number == 5:
+        Ks=np.array([K,K/4,K/2,K*2,K*4], dtype=np.int)
+        import models.model_5s as model_5s
+        traning_result_path = "training_result/model_3s"
+        model = model_5s.load_model(os.path.join(traning_result_path, model_file_name))
+        mean = np.load(os.path.join(traning_result_path, mean_file_name))["arr_0"]
+        
+    return Ks, model, mean
 
-# load the file
-estimator.loadXYZ(input_filename)
+def save_test_result(scale_number,output_filename):
+    if scale_number == 1:
+        test_result_path = "test_result/model_1s"
+    elif scale_number == 3:
+        test_result_path = "test_result/model_3s"
+    elif scale_number == 5:
+        test_result_path = "test_result/model_5s"
+    if not os.path.exists(test_result_path):
+        os.makedirs(test_result_path)
+    save_path = os.path.join(test_result_path,output_filename)
+    
+    return save_path
+        
+    
 
-Ks = None
-model = None
-if scale_number == 1:
-    Ks=np.array([K], dtype=np.int)
-    import models.model_1s as model_1s
-    model = model_1s.load_model("path_to_model_1s/model.pth")
-    mean = np.load("path_to_model_1s/mean.npz")["arr_0"]
-elif scale_number == 3:
-    Ks=np.array([K,K/2,K*2], dtype=np.int)
-    import models.model_3s as model_3s
-    model = model_3s.load_model("path_to_model_3s/model.pth")
-    mean = np.load("path_to_model_1s/mean.npz")["arr_0"]
-elif scale_number == 5:
-    Ks=np.array([K,K/4,K/2,K*2,K*4], dtype=np.int)
-    import models.model_5s as model_5s
-    model = model_5s.load_model("path_to_model_5s/model.pth")
-    mean = np.load("path_to_model_5s/mean.npz")["arr_0"]
 
-# set the neighborhood size
-estimator.set_Ks(Ks)
-print(estimator.get_Ks())
+if __name__ == "__main__":
+    
+    K = 100
+    scale_number = 1
+    batch_size = 512
+    USE_CUDA = True
+    input_filename = "test/cube_100k.xyz"
+    output_filename = "out.xyz"
 
-# initialize
-estimator.initialize()
+    # create the estimator
+    estimator = Estimator.NormalEstimatorHoughCNN()
 
-# convert model to cuda if needed
-if USE_CUDA:
-    model.cuda()
-print(model)
+    # load the file
+    estimator.loadXYZ(input_filename)
 
-model.eval()
-# iterate over the batches
-with torch.no_grad():
-    for pt_id in tqdm(range(0,estimator.size(), batch_size)):
-        bs = batch_size
-        batch = estimator.get_batch(pt_id, bs) - mean[None,:,:,:]
-        batch_th = torch.Tensor(batch)
-        if USE_CUDA:
-            batch_th = batch_th.cuda()
-        estimations = model.forward(batch_th)
-        estimations = estimations.cpu().data.numpy()
-        estimator.set_batch(pt_id,bs,estimations.astype(np.float64))
+    Ks, model, mean = load_model(K,scale_number)
 
-# save the estimator
-estimator.saveXYZ(output_filename)
+    # set the neighborhood size
+    estimator.set_Ks(Ks)
+    print(estimator.get_Ks())
+
+    # initialize
+    estimator.initialize()
+
+    # choose device
+    if torch.cuda.is_available():
+        USE_CUDA = True
+    else:
+        USE_CUDA = False
+
+    # convert model to cuda if needed
+    if USE_CUDA:
+        model.cuda()
+    print(model)
+
+    model.eval()
+    # iterate over the batches
+    with torch.no_grad():
+        for pt_id in tqdm(range(0,estimator.size(), batch_size)):
+            bs = batch_size
+            batch = estimator.get_batch(pt_id, bs) - mean[None,:,:,:]
+            batch_th = torch.Tensor(batch)
+            if USE_CUDA:
+                batch_th = batch_th.cuda()
+            estimations = model.forward(batch_th)
+            estimations = estimations.cpu().data.numpy()
+            estimator.set_batch(pt_id,bs,estimations.astype(np.float64))
+
+    # save the estimator
+    save_path = save_test_result(scale_number,output_filename)
+    estimator.saveXYZ(save_path)
