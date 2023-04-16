@@ -6,7 +6,7 @@ import numpy
 
 ext_modules = [Extension(
        "NormalEstimatorHoughCNN",
-       sources=["NormalEstimatorHoughCNN.pyx", "houghCNN.cxx"],
+       sources=["NormalEstimatorHoughCNN.pyx", "houghCNN.cpp"],
        include_dirs=["../third_party_includes/", numpy.get_include()],
        language="c++",             # generate C++ code
        extra_compile_args = ["-fopenmp", "-std=c++11"],

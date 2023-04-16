@@ -20,10 +20,16 @@
 #define NORMALS_EST_HEADER
 
 
-#include<Eigen/Dense>
-#include<nanoflann.hpp>
-#include<vector>
-#include<fstream>
+#include <Eigen/Dense>
+#include <nanoflann.hpp>
+#include <vector>
+#include <fstream>
+#include <omp.h>
+#include <iostream>
+#include <time.h>
+#include <stdlib.h>
+#include <string>
+#include <unistd.h>
 
 
 typedef Eigen::Vector3d Vector3;
@@ -35,123 +41,146 @@ typedef Eigen::MatrixX3i MatrixX3i;
 typedef Eigen::VectorXd VectorX;
 typedef Eigen::MatrixXd MatrixX;
 typedef Eigen::Vector3i Vector3i;
+typedef typename nanoflann::KDTreeEigenMatrixAdaptor< MatrixX3 > kd_tree;
 
 class HoughAccum{
-public:
-	VectorX accum;
-	MatrixX3 accum_vec;
-	Matrix3 P;
-
-	int A;
-
+	public:
+		VectorX accum;
+		MatrixX3 accum_vec;
+		Matrix3 P;
+		int A;
 };
 
-class  NormEst{
+class NormEst{
 
-	typedef typename nanoflann::KDTreeEigenMatrixAdaptor< MatrixX3 > kd_tree;
+	/* ----- class member functions ----- */
+	public:
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		set_Ks(int* array, int m);
 
-private:
-	MatrixX3 _pc; //reference to the point cloud
-	MatrixX3 _normals; //reference to the normal cloud
+		/** \brief Compute the size of Ks 
+		 *
+		 * \input[in] none
+		 *
+		 * \return size of Ks
+		 */
+		int 
+		get_Ks_size();
 
-	int T=1000; //number of triplets to pick, default is 700
-	int K_aniso=5;
-	int A=33; //side_size of accumulator
-
-	std::vector<float> proba_vector;
-	std::vector<int> counts_generated_elems;
-
-public:
-
-	std::vector<int> Ks; // TODO
-
-	void set_Ks(int* array, int m);
-	int get_Ks_size(){return Ks.size();}
-	void get_Ks(int* array, int m);
-
-	bool use_aniso; // TODO
-	bool get_density_sensitive(){return use_aniso;}
-	void set_density_sensitive(bool d_s){use_aniso=d_s;}
-
-	int maxK;
-	kd_tree* tree;
-	bool is_tree_initialized=false;
-	unsigned int randPos;
-	std::vector<HoughAccum> accums;
-
-	void initialize();
-	void get_batch(int batch_id, int batch_size, double* array);
-	void set_batch(int batch_id, int batch_size, double* array);
-
-	std::vector<unsigned int> rand_ints;
-
-	NormEst(){}
-
-	~NormEst(){
-		if(is_tree_initialized){
-	        delete tree;
-	    }
-	}
-
-
-	int size();
-	int size_normals();
-
-	int estimate(const std::string& model, const std::vector<int>& Ks, bool use_aniso);
-
-	void set_T(int T_){T=T_;}
-	void set_K_aniso(int Kaniso){K_aniso=Kaniso;}
-	void set_A(int A_){A=A_;}
-
-	const int get_T()const {return T;}
-	const int get_K_aniso() const {return K_aniso;}
-	const int get_A() const{return A;}
-
-    void get_points(double* array, int m, int n);
-    void get_normals(double* array, int m, int n);
-    void set_points(double* array, int m, int n);
-    void set_normals(double* array, int m, int n);
-
-	const MatrixX3& pc() const{return _pc;}
-	MatrixX3& normals(){return _normals;}
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		get_Ks(int* array, int m);
 
 
 
-	// io
-	void loadXYZ(const std::string& filename){
-		std::ifstream istr(filename.c_str());
-		std::vector<Eigen::Vector3d> points;
-		std::string line;
-		double x,y,z;
-		while(getline(istr, line))
-		{
-			std::stringstream sstr("");
-			sstr << line;
-			sstr >> x >> y >> z;
-			points.push_back(Eigen::Vector3d(x,y,z));
+
+	/* ----- class member variables ----- */
+	private:
+		/** \brief reference to the point cloud */
+		MatrixX3 _pc;
+
+		/** \brief reference to the normal cloud */
+		MatrixX3 _normals;
+
+		/** \brief number of triplets to pick */
+		int T=1000;
+
+		int K_aniso=5;
+
+		/** \brief side_size of accumulator */
+		int A=33;
+
+		std::vector<float> proba_vector;
+		std::vector<int> counts_generated_elems;
+
+	public:
+
+		std::vector<int> Ks; // TODO
+
+		bool use_aniso; // TODO
+		bool get_density_sensitive(){return use_aniso;}
+		void set_density_sensitive(bool d_s){use_aniso=d_s;}
+
+		int maxK;
+		kd_tree* tree;
+		bool is_tree_initialized=false;
+		unsigned int randPos;
+		std::vector<HoughAccum> accums;
+
+		void initialize();
+		void get_batch(int batch_id, int batch_size, double* array);
+		void set_batch(int batch_id, int batch_size, double* array);
+
+		std::vector<unsigned int> rand_ints;
+
+
+		int size();
+		int size_normals();
+
+		int estimate(const std::string& model, const std::vector<int>& Ks, bool use_aniso);
+
+		void set_T(int T_){T=T_;}
+		void set_K_aniso(int Kaniso){K_aniso=Kaniso;}
+		void set_A(int A_){A=A_;}
+
+		const int get_T()const {return T;}
+		const int get_K_aniso() const {return K_aniso;}
+		const int get_A() const{return A;}
+
+		void get_points(double* array, int m, int n);
+		void get_normals(double* array, int m, int n);
+		void set_points(double* array, int m, int n);
+		void set_normals(double* array, int m, int n);
+
+		const MatrixX3& pc() const{return _pc;}
+		MatrixX3& normals(){return _normals;}
+
+
+
+		// io
+		void loadXYZ(const std::string& filename){
+			std::ifstream istr(filename.c_str());
+			std::vector<Eigen::Vector3d> points;
+			std::string line;
+			double x,y,z;
+			while(getline(istr, line))
+			{
+				std::stringstream sstr("");
+				sstr << line;
+				sstr >> x >> y >> z;
+				points.push_back(Eigen::Vector3d(x,y,z));
+			}
+			istr.close();
+			_pc.resize(points.size(),3);
+			for(uint i=0; i<points.size(); i++){
+				_pc.row(i) = points[i];
+			}
 		}
-		istr.close();
-		_pc.resize(points.size(),3);
-		for(uint i=0; i<points.size(); i++){
-			_pc.row(i) = points[i];
+
+		void saveXYZ(const std::string& filename){
+			std::ofstream ofs(filename.c_str());
+			for(int i=0; i<_pc.rows(); i++){
+				ofs << _pc(i,0) << " ";
+				ofs << _pc(i,1) << " ";
+				ofs << _pc(i,2) << " ";
+				ofs << _normals(i,0) << " ";
+				ofs << _normals(i,1) << " ";
+				ofs << _normals(i,2) << std::endl;
+			}
+			ofs.close();
 		}
-	}
-
-	void saveXYZ(const std::string& filename){
-		std::ofstream ofs(filename.c_str());
-		for(int i=0; i<_pc.rows(); i++){
-			ofs << _pc(i,0) << " ";
-			ofs << _pc(i,1) << " ";
-			ofs << _pc(i,2) << " ";
-			ofs << _normals(i,0) << " ";
-			ofs << _normals(i,1) << " ";
-			ofs << _normals(i,2) << std::endl;
-		}
-		ofs.close();
-	}
 
 
-	int generate_training_accum_random_corner(int noise_val, int n_points, double* array, double* array_gt);
+		int generate_training_accum_random_corner(int noise_val, int n_points, double* array, double* array_gt);
 };
 
 

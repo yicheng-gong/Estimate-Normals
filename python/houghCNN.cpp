@@ -1,38 +1,4 @@
-// Deep Learning for Robust Normal Estimation in Unstructured Point Clouds
-// Copyright (c) 2016 Alexande Boulch and Renaud Marlet
-//
-// This program is free software; you can redistribute it and/or modify it under the
-// terms of the GNU General Public License as published by the Free Software
-// Foundation; either version 3 of the License, or any later version.
-// This program is distributed in the hope that it will be useful, but WITHOUT
-// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-// FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-// You should have received a copy of the GNU General Public License along with this
-// program; if not, write to the Free Software Foundation, Inc., 51 Franklin Street,
-// Fifth Floor, Boston, MA 02110-1301  USA
-//
-// PLEASE ACKNOWLEDGE THE ORIGINAL AUTHORS AND PUBLICATION:
-// "Deep Learning for Robust Normal Estimation in Unstructured Point Clouds "
-// by Alexandre Boulch and Renaud Marlet, Symposium of Geometry Processing 2016,
-// Computer Graphics Forum
-
-// OPENMP
-#include <omp.h>
-
-// STL
-#include <iostream>
-#include <time.h>
-#include <stdlib.h>
-#include <string>
-#include <unistd.h>
-using namespace std;
-using std::string;
-
-
 #include "houghCNN.h"
-
-
-typedef typename nanoflann::KDTreeEigenMatrixAdaptor< MatrixX3 > kd_tree;
  
 int NormEst::size(){
 	return _pc.rows();
@@ -44,7 +10,7 @@ int NormEst::size_normals(){
 
 inline void fill_accum_aniso(HoughAccum& hd, std::vector<long int>& nbh, int nbh_size,
 		const NormEst* est, unsigned int& randPos,
-		const vector<float>& proba_vector,
+		const std::vector<float>& proba_vector,
 		bool compute_P = true, Matrix3 P_ref=Matrix3())
 {
 
@@ -64,7 +30,7 @@ inline void fill_accum_aniso(HoughAccum& hd, std::vector<long int>& nbh, int nbh
 	//other refs
 	const MatrixX3& _pc = est->pc();
 	const int T = est->get_T();
-	const vector<unsigned int>& rand_ints = est->rand_ints;
+	const std::vector<unsigned int>& rand_ints = est->rand_ints;
 
 
 
@@ -106,16 +72,16 @@ inline void fill_accum_aniso(HoughAccum& hd, std::vector<long int>& nbh, int nbh
 
 
     int segNbr = 5;
-    vector<float> sums(segNbr,0);
-    vector<vector<int> > seg_nbh(segNbr);
+    std::vector<float> sums(segNbr,0);
+    std::vector<std::vector<int> > seg_nbh(segNbr);
     for(int i=0; i<nbh_size; i++){
-        int pos = min(segNbr-1, int((proba_vector[nbh[i]]-min_prob)/(max_prob-min_prob)*segNbr));
+        int pos = std::min(segNbr-1, int((proba_vector[nbh[i]]-min_prob)/(max_prob-min_prob)*segNbr));
         seg_nbh[pos].push_back(i);
         sums[pos] += proba_vector[nbh[i]];
     }
 
 	// create the cumulative vector
-	vector<float> cumulative_proba(segNbr);
+	std::vector<float> cumulative_proba(segNbr);
 	cumulative_proba[0] = sums[0];
 	for(int i=1; i<segNbr; i++){
 		cumulative_proba[i] = sums[i] + cumulative_proba[i-1];
@@ -235,7 +201,7 @@ inline void fill_accum_not_aniso(HoughAccum& hd, std::vector<long int>& nbh, int
 	//other refs
 	const MatrixX3& _pc = est->pc();
 	const int T = est->get_T();
-	const vector<unsigned int>& rand_ints = est->rand_ints;
+	const std::vector<unsigned int>& rand_ints = est->rand_ints;
 
 	//regression
 	for(int i=0; i<nbh_size; i++){
@@ -330,7 +296,7 @@ inline void fill_accum_not_aniso(HoughAccum& hd, std::vector<long int>& nbh, int
 }
 
 //return the square distance to the farthest point
-inline double searchKNN(const kd_tree& tree, const Vector3& pt, int K, vector<long int>& indices, vector<double>& distances){
+inline double searchKNN(const kd_tree& tree, const Vector3& pt, int K, std::vector<long int>& indices, std::vector<double>& distances){
 	indices.resize(K);
 	distances.resize(K);
 	tree.index->knnSearch(&pt[0], K, &indices[0], &distances[0]);
@@ -341,12 +307,12 @@ inline double searchKNN(const kd_tree& tree, const Vector3& pt, int K, vector<lo
 }
 
 
-bool compare_pair_int_double(const pair<long int,double>& p1, const pair<long int,double>& p2){
+bool compare_pair_int_double(const std::pair<long int,double>& p1, const std::pair<long int,double>& p2){
     return p1.second < p2.second;
 }
 
-inline void sort_indices_by_distances(vector<long int>& indices, const vector<double>& distances){
-    vector< pair<long int,double> > v(distances.size());
+inline void sort_indices_by_distances(std::vector<long int>& indices, const std::vector<double>& distances){
+    std::vector<std::pair<long int,double> > v(distances.size());
     for(uint i=0; i<indices.size(); i++){
         v[i].first = indices[i];
         v[i].second = distances[i];
@@ -392,8 +358,8 @@ void NormEst::initialize(){
     		const Vector3& pt = _pc.row(pt_id); //reference to the current point
 
     		//get the neighborhood
-    		vector<long int> indices;
-    		vector<double> distances;
+    		std::vector<long int> indices;
+    		std::vector<double> distances;
     		searchKNN(*tree,pt,K_aniso, indices, distances);
 
     		float md = 0;
@@ -422,8 +388,8 @@ void NormEst::get_batch(int batch_id, int batch_size, double* array) { // array 
         const Vector3& pt = _pc.row(pt_id);
 
         //get the max neighborhood
-        vector<long int> indices;
-        vector<double> distances;
+        std::vector<long int> indices;
+        std::vector<double> distances;
         searchKNN(*tree,pt,maxK, indices, distances);
 
         // for knn search distances appear to be sorted
@@ -548,18 +514,38 @@ void NormEst::set_normals(double* array, int m, int n){
     return ;
 }
 
-void NormEst::set_Ks(int* array, int m){
+///////////////////////////////////////////////////////////////////////////////
+
+void 
+NormEst::set_Ks(int* array, int m)
+{
 	Ks.resize(m);
-	for (int i = 0; i < m; i++){
+	for (int i = 0; i < m; i++)
+	{
 		Ks[i] = array[i];
 	}
 }
 
-void NormEst::get_Ks(int* array, int m){
-    for (int i = 0; i < m; i++){
+///////////////////////////////////////////////////////////////////////////////
+
+int 
+NormEst::get_Ks_size()
+{
+	return Ks.size();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void 
+NormEst::get_Ks(int* array, int m)
+{
+    for (int i = 0; i < m; i++)
+	{
 		array[i] = Ks[i];
 	}
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 //
 // training set generation
@@ -660,8 +646,8 @@ void create_angle(Eigen::MatrixX3d& points, Eigen::MatrixX3d& normals, double an
 	// }
 
 
-	vector<Eigen::Vector3d> ref_points;
-	vector<Eigen::Vector3d> ref_normals;
+	std::vector<Eigen::Vector3d> ref_points;
+	std::vector<Eigen::Vector3d> ref_normals;
 	ref_points.push_back(Eigen::Vector3d(-1,0,0));
 	ref_normals.push_back(N0);
 	ref_points.push_back(Eigen::Vector3d(cos(M_PI/3),sin(M_PI/3),0));
@@ -740,8 +726,8 @@ void add_gaussian_noise_percentage(Eigen::MatrixX3d& pc, int percentage){
 	double dist = 0;
 	for(int i=0; i<pc.rows(); i++){
 		const Eigen::Vector3d& pt = pc.row(i);
-		vector<long int> pt_neighbors(2);
-		vector<double> distances(2);
+		std::vector<long int> pt_neighbors(2);
+		std::vector<double> distances(2);
 		tree.index->knnSearch(&pt[0], 2, &pt_neighbors[0], &distances[0]);
 		dist += sqrt(distances[0]);
 		dist += sqrt(distances[1]);
@@ -786,7 +772,7 @@ int NormEst::generate_training_accum_random_corner(int noise_val, int n_points, 
 	initialize();
 
 	// create a list of point indices
-	vector<int> point_ids;
+	std::vector<int> point_ids;
 	for(int pt_id=0; pt_id < _pc.rows(); pt_id++){
 		const Vector3& pt = _pc.row(pt_id); //reference to the current point
 		if(pt.squaredNorm() > max_square_dist){continue;}
@@ -818,8 +804,8 @@ int NormEst::generate_training_accum_random_corner(int noise_val, int n_points, 
         const Vector3& pt = _pc.row(pt_id);
 
         //get the max neighborhood
-        vector<long int> indices;
-        vector<double> distances;
+        std::vector<long int> indices;
+        std::vector<double> distances;
         searchKNN(*tree,pt,maxK, indices, distances);
 
         // for knn search distances appear to be sorted
