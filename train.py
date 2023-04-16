@@ -1,24 +1,6 @@
-# Deep Learning for Robust Normal Estimation in Unstructured Point Clouds
-# Copyright (c) 2016 Alexande Boulch and Renaud Marlet
-#
-# This program is free software; you can redistribute it and/or modify it under the
-# terms of the GNU General Public License as published by the Free Software
-# Foundation; either version 3 of the License, or any later version.
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License along with this
-# program; if not, write to the Free Software Foundation, Inc., 51 Franklin Street,
-# Fifth Floor, Boston, MA 02110-1301  USA
-#
-# PLEASE ACKNOWLEDGE THE ORIGINAL AUTHORS AND PUBLICATION:
-# "Deep Learning for Robust Normal Estimation in Unstructured Point Clouds "
-# by Alexandre Boulch and Renaud Marlet, Symposium of Geometry Processing 2016,
-# Computer Graphics Forum
-
+# package used
 import python.NormalEstimatorHoughCNN as Estimator
 import numpy as np
-from tqdm import *
 import torch
 from torch.autograd import Variable
 import torch.nn as nn
@@ -28,38 +10,7 @@ from tqdm import tqdm
 import pickle
 import os
 
-torch.backends.cudnn.benchmark = True
-
-K = 100
-scale_number = 1
-batch_size = 256
-USE_CUDA = True
-
-create_dataset = True
-train = True
-dataset_size = 100000
-dataset_directory = "diretory_for_saving_dataset"
-result_directory = "directory_for_saving_trained_model"
-
-drop_learning_rate = 0.5
-learning_rate = 0.1
-epoch_max = 40
-decrease_step = 4
-
-# create thestimator
-estimator = Estimator.NormalEstimatorHoughCNN()
-
-Ks = None
-if scale_number == 1:
-    Ks=np.array([K], dtype=int)
-elif scale_number == 3:
-    Ks=np.array([K,K/2,K*2], dtype=int)
-elif scale_number == 5:
-    Ks=np.array([K,K/4,K/2,K*2,K*4], dtype=int)
-
-estimator.set_Ks(Ks)
-
-if create_dataset:
+def dataset_create(dataset_path, dataset_name, dataset_size, scale_number, batch_size, estimator):
     print("creating dataset")
     count = 0
     dataset = np.zeros((dataset_size, scale_number, 33,33))
@@ -73,53 +24,96 @@ if create_dataset:
         count += nbr
         if(count >= dataset_size):
             break
+        
     # save the dataset
     mean = dataset.mean(axis=0)
     print(mean.shape)
     dataset = {"input":dataset, "targets":targets, "mean":mean}
     print("  saving")
-    os.makedirs(dataset_directory, exist_ok=True)
-    pickle.dump( dataset, open( os.path.join(dataset_directory, "dataset.p"), "wb" ) )
+    os.makedirs(dataset_path, exist_ok=True)
+    pickle.dump( dataset, open( os.path.join(dataset_path, dataset_name), "wb" ) )
     print("-->done")
+    
 
-if train:
-    # create the model
-    print("creating the model")
+if __name__ == "__main__":
+    
+    # faster computation times
+    torch.backends.cudnn.benchmark = True
+
+    # training model parameter
+    K = 100
+    scale_number = 1
+    batch_size = 256
+
+    # choose device
+    if torch.cuda.is_available():
+        USE_CUDA = True
+    else:
+        USE_CUDA = False
+    
+    # create the estimator
+    estimator = Estimator.NormalEstimatorHoughCNN()
+    # Ks computing and model selecting
     if scale_number == 1:
+        Ks=np.array([K], dtype=int)
         import models.model_1s as model_def
+        model_result_path = "model_1s"
     elif scale_number == 3:
+        Ks=np.array([K,K/2,K*2], dtype=int)
         import models.model_3s as model_def
+        model_result_path = "model_3s"
     elif scale_number == 5:
+        Ks=np.array([K,K/4,K/2,K*2,K*4], dtype=int)
         import models.model_5s as model_def
+        model_result_path = "model_5s"
+    estimator.set_Ks(Ks)
     net = model_def.create_model()
 
-    # load the dataset
+    # configure dataset
+    dataset_size = 100000
+    dataset_path = "dataset"
+    dataset_name = "dataset.p"
+    if not os.path.exists(dataset_path):
+        os.makedirs(dataset_path)
+    dataset_path = os.path.join(dataset_path, dataset_name)
+    if not os.path.exists(dataset_path):
+        dataset_create(dataset_path, dataset_name, dataset_size, scale_number, batch_size, estimator)
+        
+    # dataset loading
     print("loading the model")
-    dataset = pickle.load( open( os.path.join(dataset_directory, "dataset.p"), "rb" ) )
-
-    print("Creating optimizer")
-    criterion = nn.MSELoss()
-    optimizer = optim.SGD(net.parameters(), lr=learning_rate, weight_decay=5e-4, momentum=0.9)
-
-    if USE_CUDA:
-        net.cuda()
-        criterion.cuda()
-
+    dataset = pickle.load(open(os.path.join(dataset_path, dataset_name), "rb" ))
     dataset["input"] -= dataset["mean"][None,:,:,:]
-
     input_data = torch.from_numpy(dataset["input"]).float()
     target_data = torch.from_numpy(dataset["targets"]).float()
     ds = torch.utils.data.TensorDataset(input_data, target_data)
     ds_loader = torch.utils.data.DataLoader(ds, batch_size=batch_size, shuffle=True)
-
+    
+    # training parameter
+    drop_learning_rate = 0.5
+    learning_rate = 0.1
+    epoch_max = 40
+    decrease_step = 4
+    
+    # create optimizer
+    print("Creating optimizer")
+    criterion = nn.MSELoss()
+    optimizer = optim.SGD(net.parameters(), lr=learning_rate, weight_decay=5e-4, momentum=0.9)
+    
+    # apply in gpu
+    if USE_CUDA:
+        net.cuda()
+        criterion.cuda()
+        
+    # training result store
+    result_path = "training_result"
+    result_path = os.path.join(result_path, model_result_path)
+    if not os.path.exists(result_path):
+        os.makedirs(result_path)
+    np.savez(os.path.join(result_path, "dataset_mean"), dataset["mean"])
+    f = open(os.path.join(result_path, "training_logs.txt"), "w")
+    
+    # start train
     print("Training")
-
-    if not os.path.exists(result_directory):
-        os.makedirs(result_directory)
-
-    np.savez(os.path.join(result_directory, "mean"),dataset["mean"])
-    f = open(os.path.join(result_directory, "logs.txt"), "w")
-
     for epoch in range(epoch_max):
 
         if(epoch%decrease_step==0 and epoch>0):
@@ -162,6 +156,8 @@ if train:
         f.flush()
 
         # save the model
-        torch.save(net.state_dict(), os.path.join(result_directory, "state_dict.pth"))
+        torch.save(net.state_dict(), os.path.join(result_path, "state_dict.pth"))
 
     f.close()
+    
+    print("training finished")
