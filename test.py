@@ -1,28 +1,12 @@
-# Deep Learning for Robust Normal Estimation in Unstructured Point Clouds
-# Copyright (c) 2016 Alexande Boulch and Renaud Marlet
-#
-# This program is free software; you can redistribute it and/or modify it under the
-# terms of the GNU General Public License as published by the Free Software
-# Foundation; either version 3 of the License, or any later version.
-# This program is distributed in the hope that it will be useful, but WITHOUT
-# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-# You should have received a copy of the GNU General Public License along with this
-# program; if not, write to the Free Software Foundation, Inc., 51 Franklin Street,
-# Fifth Floor, Boston, MA 02110-1301  USA
-#
-# PLEASE ACKNOWLEDGE THE ORIGINAL AUTHORS AND PUBLICATION:
-# "Deep Learning for Robust Normal Estimation in Unstructured Point Clouds "
-# by Alexandre Boulch and Renaud Marlet, Symposium of Geometry Processing 2016,
-# Computer Graphics Forum
-
-# from python.lib.python.NormalEstimatorHoughCNN import NormEst as Estimator
+# package used
 import python.NormalEstimatorHoughCNN as Estimator
 import numpy as np
 from tqdm import *
 import torch
 from torch.autograd import Variable
 import os
+import trimesh
+import scipy
 
 
 def load_model(K,scale_number):
@@ -69,18 +53,27 @@ if __name__ == "__main__":
     scale_number = 1
     batch_size = 512
     USE_CUDA = True
-    input_filename = "test/cube_100k.xyz"
-    if not os.path.exists(input_filename):
+    input_file_path = "sources/meshes"
+    input_file_name = "bunny"
+    input_file = os.path.join(input_file_path, input_file_name + ".obj")
+    if not os.path.exists(input_file):
         print("no file exists! Check the path!")
+        
+    # mesh load
+    input_mesh = trimesh.load(input_file)
+    input_mesh_norm = input_mesh.vertex_normals
     
-    output_filename = "out.xyz"
+    # store as .xyz file
+    xyz_file_path = "sources/xyzfiles"
+    xyz_file_name = input_file_name + ".xyz"
+    xyz_file = os.path.join(xyz_file_path, xyz_file_name)
+    np.savetxt(xyz_file, input_mesh.vertices, delimiter=' ', fmt='%f')
 
     # create the estimator
     estimator = Estimator.NormalEstimatorHoughCNN()
 
     # load the file
-    estimator.loadXYZ(input_filename)
-    print(estimator.getPCSize())
+    estimator.loadXYZ(xyz_file)
 
     Ks, model, mean = load_model(K,scale_number)
 
@@ -111,8 +104,12 @@ if __name__ == "__main__":
                 batch_th = batch_th.cuda()
             estimations = model.forward(batch_th)
             estimations = estimations.cpu().data.numpy()
-            estimator.setBatch(pt_id,bs,estimations.astype(np.float64))
+            estimator.setBatch(pt_id,bs,estimations.astype(float))
 
     # save the estimator
-    save_path = save_test_result(scale_number,output_filename)
+    save_path = save_test_result(scale_number, xyz_file_name)
     estimator.saveXYZ(save_path)
+    est_normals = estimator.getNormals()
+    
+    MSE = np.linalg.norm((input_mesh_norm - est_normals))
+    print(MSE)

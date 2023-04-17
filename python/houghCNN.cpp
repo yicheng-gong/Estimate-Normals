@@ -25,10 +25,382 @@ NormEst::getKs(int* array, int m)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-inline void fill_accum_aniso(HoughAccum& hd, std::vector<long int>& nbh, int nbh_size,
-		const NormEst* est, unsigned int& randPos,
-		const std::vector<float>& proba_vector,
-		bool compute_P = true, Matrix3 P_ref=Matrix3())
+void 
+NormEst::initialize()
+{
+    // compute max K
+    maxK = 0;
+    for(uint i=0; i<Ks.size(); i++)
+        if(maxK<Ks[i])
+            maxK = Ks[i];
+
+    // compute the randints
+	int nbr = 1e7;
+	rand_ints.resize(nbr);
+	for(int i=0; i<nbr; i++){
+		rand_ints[i]  = rand();
+	}
+
+	// resize the normals
+	int N = _pc.rows();
+	_normals.resize(N,3);
+
+	// create the tree
+    if(is_tree_initialized){
+        delete tree;
+    }
+	tree = new kd_tree(3, _pc, 10 /* max leaf */ );
+	tree->index->buildIndex();
+
+    // estimate the probas
+    if(use_aniso){
+    	proba_vector.resize(N);
+        #pragma omp parallel for
+    	for(int pt_id=0; pt_id<N; pt_id++){
+
+    		const Vector3& pt = _pc.row(pt_id); //reference to the current point
+
+    		//get the neighborhood
+    		std::vector<long int> indices;
+    		std::vector<double> distances;
+    		searchKNN(*tree,pt,K_aniso, indices, distances);
+
+    		float md = 0;
+    		for(uint i=0; i<distances.size(); i++)
+    			if(md<distances[i])
+    				md = distances[i];
+
+    		proba_vector[pt_id] = md;
+    	}
+    }
+
+    randPos = 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void 
+NormEst::getBatch(int batch_id, int batch_size, double* array) 
+{ // array batch_size, Ks.size, A, A
+
+    accums.resize(batch_size);
+
+    // create forward tensor
+    unsigned int randPos2 = randPos;
+    //#pragma omp parallel for firstprivate(randPos2)
+    for(int pt_id=batch_id; pt_id<batch_id+batch_size; pt_id++){
+        if(pt_id>=_pc.rows()) continue;
+
+        //reference to the current point
+        const Vector3& pt = _pc.row(pt_id);
+
+        //get the max neighborhood
+        std::vector<long int> indices;
+        std::vector<double> distances;
+        searchKNN(*tree,pt,maxK, indices, distances);
+
+        // for knn search distances appear to be sorted
+        sort_indices_by_distances(indices, distances);
+
+        if(use_aniso){
+            for(uint k_id=0; k_id<Ks.size(); k_id++){
+                //fill the patch and get the rotation matrix
+                HoughAccum hd;
+                if(k_id==0){
+                    fill_accum_aniso(hd,indices,Ks[k_id], this, randPos2, proba_vector);
+                    accums[pt_id-batch_id] = hd;
+                }else{
+                    fill_accum_aniso(hd,indices,Ks[k_id], this, randPos2,  proba_vector, false, accums[pt_id-batch_id].P);
+                }
+
+                for(int i=0; i<A*A; i++){
+                    array[A*A*Ks.size()*(pt_id-batch_id)+ A*A*k_id +i] = hd.accum[i];
+                }
+            }
+        }else{
+
+            for(uint k_id=0; k_id<Ks.size(); k_id++){
+                //fill the patch and get the rotation matrix
+                HoughAccum hd;
+                if(k_id==0){
+                    fill_accum_not_aniso(hd,indices,Ks[k_id], this, randPos);
+                    accums[pt_id-batch_id] = hd;
+                }else{
+                    fill_accum_not_aniso(hd,indices,Ks[k_id], this, randPos, false, accums[pt_id-batch_id].P);
+                }
+
+                for(int i=0; i<A*A; i++){
+                    array[A*A*Ks.size()*(pt_id-batch_id)+ A*A*k_id +i] = hd.accum[i];
+                }
+            }
+        }
+    }
+
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void 
+NormEst::setBatch(int batch_id, int batch_size, double* array)
+{
+    // fill the normal
+    #pragma omp parallel for
+    for(int pt_id=batch_id; pt_id<batch_id+batch_size; pt_id++){
+        if(pt_id>=_pc.rows()) continue;
+
+        // compute final normal
+        Vector3 nl(array[2*(pt_id-batch_id)],array[2*(pt_id-batch_id)+1],0);
+        double squaredNorm = nl.squaredNorm();
+        if(squaredNorm>1){
+            nl.normalize();
+        }else{
+            nl[2] = sqrt(1.-squaredNorm);
+        }
+        nl = accums[pt_id-batch_id].P.inverse()*nl;
+        nl.normalize();
+
+        // store the normals
+        _normals.row(pt_id) =nl;
+    }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void 
+NormEst::getPoints(double* array, int m, int n) 
+{
+    int i, j ;
+    int index = 0 ;
+
+    for (i = 0; i < m; i++) {
+        for (j = 0; j < n; j++) {
+            array[index] = _pc(i,j);
+            index ++ ;
+            }
+        }
+    return ;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void NormEst::getNormals(double* array, int m, int n) 
+{
+    int i, j ;
+    int index = 0 ;
+
+    for (i = 0; i < m; i++) {
+        for (j = 0; j < n; j++) {
+            array[index] = _normals(i,j);
+            index ++ ;
+            }
+        }
+    return ;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void NormEst::setPoints(double* array, int m, int n)
+{
+    // resize the point cloud
+    _pc.resize(m,3);
+
+    // fill the point cloud
+    int i, j ;
+    int index = 0 ;
+    for (i = 0; i < m; i++) {
+        for (j = 0; j < n; j++) {
+            _pc(i,j) = array[index];
+            index ++ ;
+        }
+    }
+    return ;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void 
+NormEst::setNormals(double* array, int m, int n)
+{
+    // resize the point cloud
+    _normals.resize(m,3);
+
+    // fill the point cloud
+    int i, j ;
+    int index = 0 ;
+    for (i = 0; i < m; i++) {
+        for (j = 0; j < n; j++) {
+            _normals(i,j) = array[index];
+            index ++ ;
+        }
+    }
+    return ;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+int 
+NormEst::generateTrainAccRandomCorner(int noise_val, int n_points, double* array, double* array_gt)
+{
+	K_aniso = 5;
+	T = 1000;
+	A = 33;
+	is_tree_initialized = false;
+
+	int N = 5000; // size of the point cloud to be generated
+    double angle_max = 1.; // max angle of the angle
+    double angle_min = 0.2; // min angle of the points cloud
+	double max_square_dist = 0.02; // maximal square dist to accept point (be sure it include a corner or an edge)
+
+	// generate angle point cloud
+	double angle = (rand()+0.)/RAND_MAX;
+	angle = angle*(angle_max-angle_min)+angle_min;
+	double val = (rand()+0.)/RAND_MAX;
+	int noise = int(val*val*200);
+	if(noise_val>=0){
+		noise = noise_val;
+	}
+	MatrixX3 normals_gt;
+	create_angle(_pc, normals_gt, angle, N);
+	random_rotation(_pc, normals_gt);
+	add_gaussian_noise_percentage(_pc, noise);
+
+	// TODO
+	//set_Ks(Ks);
+
+	// initialize acquisition
+	initialize();
+
+	// create a list of point indices
+	std::vector<int> point_ids;
+	for(int pt_id=0; pt_id < _pc.rows(); pt_id++){
+		const Vector3& pt = _pc.row(pt_id); //reference to the current point
+		if(pt.squaredNorm() > max_square_dist){continue;}
+		point_ids.push_back(pt_id);
+	}
+
+	// randomly select good points
+	if(int(point_ids.size()) > n_points){
+		for(int i=0; i<n_points; i++){
+			int temp_id = rand()%point_ids.size();
+			int temp = point_ids[temp_id];
+			point_ids[temp_id] = point_ids[i];
+			point_ids[i] = temp;
+		}
+		point_ids.resize(n_points);
+	}
+
+	// construct the batch
+
+    unsigned int randPos2 = randPos;
+
+    accums.resize(n_points);
+
+
+    for(uint pt_i=0; pt_i<point_ids.size(); pt_i ++){
+        int pt_id = point_ids[pt_i];
+
+        //reference to the current point
+        const Vector3& pt = _pc.row(pt_id);
+
+        //get the max neighborhood
+        std::vector<long int> indices;
+        std::vector<double> distances;
+        searchKNN(*tree,pt,maxK, indices, distances);
+
+        // for knn search distances appear to be sorted
+        sort_indices_by_distances(indices, distances);
+
+        if(use_aniso){
+            for(uint k_id=0; k_id<Ks.size(); k_id++){
+                //fill the patch and get the rotation matrix
+                HoughAccum hd;
+                if(k_id==0){
+                    fill_accum_aniso(hd,indices,Ks[k_id], this, randPos2, proba_vector);
+                    accums[pt_i] = hd;
+                }else{
+                    fill_accum_aniso(hd,indices,Ks[k_id], this, randPos2,  proba_vector, false, accums[pt_i].P);
+                }
+
+                for(int i=0; i<A*A; i++){
+                    array[A*A*Ks.size()*(pt_i)+ A*A*k_id +i] = hd.accum[i];
+                }
+            }
+        }else{
+
+            for(uint k_id=0; k_id<Ks.size(); k_id++){
+                //fill the patch and get the rotation matrix
+                HoughAccum hd;
+                if(k_id==0){
+                    fill_accum_not_aniso(hd,indices,Ks[k_id], this, randPos2);
+                    accums[pt_i] = hd;
+                }else{
+                    fill_accum_not_aniso(hd,indices,Ks[k_id], this, randPos2, false, accums[pt_i].P);
+                }
+
+                for(int i=0; i<A*A; i++){
+                    array[A*A*Ks.size()*(pt_i)+ A*A*k_id +i] = hd.accum[i];
+                }
+            }
+        }
+		Vector3 nl = normals_gt.row(pt_id).transpose();
+		nl.normalize();
+		nl = accums[pt_i].P*nl;
+		if(nl.dot(Vector3(0,0,1))<0) nl*=-1;
+		array_gt[2*pt_i+0] = nl[0];
+		array_gt[2*pt_i+1] = nl[1];
+    }
+
+	return point_ids.size();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void 
+NormEst::loadXYZ(const std::string& filename)
+{
+	std::ifstream istr(filename.c_str());
+	std::vector<Eigen::Vector3d> points;
+	std::string line;
+	double x,y,z;
+	while(getline(istr, line))
+	{
+		std::stringstream sstr("");
+		sstr << line;
+		sstr >> x >> y >> z;
+		points.push_back(Eigen::Vector3d(x,y,z));
+	}
+	istr.close();
+	_pc.resize(points.size(),3);
+	for(uint i=0; i<points.size(); i++)
+	{
+		_pc.row(i) = points[i];
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void 
+NormEst::saveXYZ(const std::string& filename)
+{
+	std::ofstream ofs(filename.c_str());
+	for(int i=0; i<_pc.rows(); i++){
+		ofs << _pc(i,0) << " ";
+		ofs << _pc(i,1) << " ";
+		ofs << _pc(i,2) << " ";
+		ofs << _normals(i,0) << " ";
+		ofs << _normals(i,1) << " ";
+		ofs << _normals(i,2) << std::endl;
+	}
+	ofs.close();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+inline void 
+fill_accum_aniso(HoughAccum& hd, std::vector<long int>& nbh, int nbh_size,
+				const NormEst* est, unsigned int& randPos,
+				const std::vector<float>& proba_vector,
+				bool compute_P = true, Matrix3 P_ref=Matrix3())
 {
 
 	//references
@@ -342,219 +714,6 @@ inline void sort_indices_by_distances(std::vector<long int>& indices, const std:
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void 
-NormEst::initialize()
-{
-    // compute max K
-    maxK = 0;
-    for(uint i=0; i<Ks.size(); i++)
-        if(maxK<Ks[i])
-            maxK = Ks[i];
-
-    // compute the randints
-	int nbr = 1e7;
-	rand_ints.resize(nbr);
-	for(int i=0; i<nbr; i++){
-		rand_ints[i]  = rand();
-	}
-
-	// resize the normals
-	int N = _pc.rows();
-	_normals.resize(N,3);
-
-	// create the tree
-    if(is_tree_initialized){
-        delete tree;
-    }
-	tree = new kd_tree(3, _pc, 10 /* max leaf */ );
-	tree->index->buildIndex();
-
-    // estimate the probas
-    if(use_aniso){
-    	proba_vector.resize(N);
-        #pragma omp parallel for
-    	for(int pt_id=0; pt_id<N; pt_id++){
-
-    		const Vector3& pt = _pc.row(pt_id); //reference to the current point
-
-    		//get the neighborhood
-    		std::vector<long int> indices;
-    		std::vector<double> distances;
-    		searchKNN(*tree,pt,K_aniso, indices, distances);
-
-    		float md = 0;
-    		for(uint i=0; i<distances.size(); i++)
-    			if(md<distances[i])
-    				md = distances[i];
-
-    		proba_vector[pt_id] = md;
-    	}
-    }
-
-    randPos = 0;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void 
-NormEst::getBatch(int batch_id, int batch_size, double* array) 
-{ // array batch_size, Ks.size, A, A
-
-    accums.resize(batch_size);
-
-    // create forward tensor
-    unsigned int randPos2 = randPos;
-    //#pragma omp parallel for firstprivate(randPos2)
-    for(int pt_id=batch_id; pt_id<batch_id+batch_size; pt_id++){
-        if(pt_id>=_pc.rows()) continue;
-
-        //reference to the current point
-        const Vector3& pt = _pc.row(pt_id);
-
-        //get the max neighborhood
-        std::vector<long int> indices;
-        std::vector<double> distances;
-        searchKNN(*tree,pt,maxK, indices, distances);
-
-        // for knn search distances appear to be sorted
-        sort_indices_by_distances(indices, distances);
-
-        if(use_aniso){
-            for(uint k_id=0; k_id<Ks.size(); k_id++){
-                //fill the patch and get the rotation matrix
-                HoughAccum hd;
-                if(k_id==0){
-                    fill_accum_aniso(hd,indices,Ks[k_id], this, randPos2, proba_vector);
-                    accums[pt_id-batch_id] = hd;
-                }else{
-                    fill_accum_aniso(hd,indices,Ks[k_id], this, randPos2,  proba_vector, false, accums[pt_id-batch_id].P);
-                }
-
-                for(int i=0; i<A*A; i++){
-                    array[A*A*Ks.size()*(pt_id-batch_id)+ A*A*k_id +i] = hd.accum[i];
-                }
-            }
-        }else{
-
-            for(uint k_id=0; k_id<Ks.size(); k_id++){
-                //fill the patch and get the rotation matrix
-                HoughAccum hd;
-                if(k_id==0){
-                    fill_accum_not_aniso(hd,indices,Ks[k_id], this, randPos);
-                    accums[pt_id-batch_id] = hd;
-                }else{
-                    fill_accum_not_aniso(hd,indices,Ks[k_id], this, randPos, false, accums[pt_id-batch_id].P);
-                }
-
-                for(int i=0; i<A*A; i++){
-                    array[A*A*Ks.size()*(pt_id-batch_id)+ A*A*k_id +i] = hd.accum[i];
-                }
-            }
-        }
-    }
-
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void 
-NormEst::setBatch(int batch_id, int batch_size, double* array)
-{
-    // fill the normal
-    #pragma omp parallel for
-    for(int pt_id=batch_id; pt_id<batch_id+batch_size; pt_id++){
-        if(pt_id>=_pc.rows()) continue;
-
-        // compute final normal
-        Vector3 nl(array[2*(pt_id-batch_id)],array[2*(pt_id-batch_id)+1],0);
-        double squaredNorm = nl.squaredNorm();
-        if(squaredNorm>1){
-            nl.normalize();
-        }else{
-            nl[2] = sqrt(1.-squaredNorm);
-        }
-        nl = accums[pt_id-batch_id].P.inverse()*nl;
-        nl.normalize();
-
-        // store the normals
-        _normals.row(pt_id) =nl;
-    }
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void 
-NormEst::getPoints(double* array, int m, int n) 
-{
-    int i, j ;
-    int index = 0 ;
-
-    for (i = 0; i < m; i++) {
-        for (j = 0; j < n; j++) {
-            array[index] = _pc(i,j);
-            index ++ ;
-            }
-        }
-    return ;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void NormEst::getNormals(double* array, int m, int n) 
-{
-    int i, j ;
-    int index = 0 ;
-
-    for (i = 0; i < m; i++) {
-        for (j = 0; j < n; j++) {
-            array[index] = _normals(i,j);
-            index ++ ;
-            }
-        }
-    return ;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void NormEst::setPoints(double* array, int m, int n)
-{
-    // resize the point cloud
-    _pc.resize(m,3);
-
-    // fill the point cloud
-    int i, j ;
-    int index = 0 ;
-    for (i = 0; i < m; i++) {
-        for (j = 0; j < n; j++) {
-            _pc(i,j) = array[index];
-            index ++ ;
-        }
-    }
-    return ;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void 
-NormEst::setNormals(double* array, int m, int n)
-{
-    // resize the point cloud
-    _normals.resize(m,3);
-
-    // fill the point cloud
-    int i, j ;
-    int index = 0 ;
-    for (i = 0; i < m; i++) {
-        for (j = 0; j < n; j++) {
-            _normals(i,j) = array[index];
-            index ++ ;
-        }
-    }
-    return ;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
 //
 // training set generation
 //
@@ -746,164 +905,6 @@ void add_gaussian_noise_percentage(Eigen::MatrixX3d& pc, int percentage){
 	//cout << "Noise scale : " << dist << endl;
 	add_gaussian_noise(pc, dist);
 
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-int 
-NormEst::generateTrainAccRandomCorner(int noise_val, int n_points, double* array, double* array_gt)
-{
-	K_aniso = 5;
-	T = 1000;
-	A = 33;
-	is_tree_initialized = false;
-
-	int N = 5000; // size of the point cloud to be generated
-    double angle_max = 1.; // max angle of the angle
-    double angle_min = 0.2; // min angle of the points cloud
-	double max_square_dist = 0.02; // maximal square dist to accept point (be sure it include a corner or an edge)
-
-	// generate angle point cloud
-	double angle = (rand()+0.)/RAND_MAX;
-	angle = angle*(angle_max-angle_min)+angle_min;
-	double val = (rand()+0.)/RAND_MAX;
-	int noise = int(val*val*200);
-	if(noise_val>=0){
-		noise = noise_val;
-	}
-	MatrixX3 normals_gt;
-	create_angle(_pc, normals_gt, angle, N);
-	random_rotation(_pc, normals_gt);
-	add_gaussian_noise_percentage(_pc, noise);
-
-	// TODO
-	//set_Ks(Ks);
-
-	// initialize acquisition
-	initialize();
-
-	// create a list of point indices
-	std::vector<int> point_ids;
-	for(int pt_id=0; pt_id < _pc.rows(); pt_id++){
-		const Vector3& pt = _pc.row(pt_id); //reference to the current point
-		if(pt.squaredNorm() > max_square_dist){continue;}
-		point_ids.push_back(pt_id);
-	}
-
-	// randomly select good points
-	if(int(point_ids.size()) > n_points){
-		for(int i=0; i<n_points; i++){
-			int temp_id = rand()%point_ids.size();
-			int temp = point_ids[temp_id];
-			point_ids[temp_id] = point_ids[i];
-			point_ids[i] = temp;
-		}
-		point_ids.resize(n_points);
-	}
-
-	// construct the batch
-
-    unsigned int randPos2 = randPos;
-
-    accums.resize(n_points);
-
-
-    for(uint pt_i=0; pt_i<point_ids.size(); pt_i ++){
-        int pt_id = point_ids[pt_i];
-
-        //reference to the current point
-        const Vector3& pt = _pc.row(pt_id);
-
-        //get the max neighborhood
-        std::vector<long int> indices;
-        std::vector<double> distances;
-        searchKNN(*tree,pt,maxK, indices, distances);
-
-        // for knn search distances appear to be sorted
-        sort_indices_by_distances(indices, distances);
-
-        if(use_aniso){
-            for(uint k_id=0; k_id<Ks.size(); k_id++){
-                //fill the patch and get the rotation matrix
-                HoughAccum hd;
-                if(k_id==0){
-                    fill_accum_aniso(hd,indices,Ks[k_id], this, randPos2, proba_vector);
-                    accums[pt_i] = hd;
-                }else{
-                    fill_accum_aniso(hd,indices,Ks[k_id], this, randPos2,  proba_vector, false, accums[pt_i].P);
-                }
-
-                for(int i=0; i<A*A; i++){
-                    array[A*A*Ks.size()*(pt_i)+ A*A*k_id +i] = hd.accum[i];
-                }
-            }
-        }else{
-
-            for(uint k_id=0; k_id<Ks.size(); k_id++){
-                //fill the patch and get the rotation matrix
-                HoughAccum hd;
-                if(k_id==0){
-                    fill_accum_not_aniso(hd,indices,Ks[k_id], this, randPos2);
-                    accums[pt_i] = hd;
-                }else{
-                    fill_accum_not_aniso(hd,indices,Ks[k_id], this, randPos2, false, accums[pt_i].P);
-                }
-
-                for(int i=0; i<A*A; i++){
-                    array[A*A*Ks.size()*(pt_i)+ A*A*k_id +i] = hd.accum[i];
-                }
-            }
-        }
-		Vector3 nl = normals_gt.row(pt_id).transpose();
-		nl.normalize();
-		nl = accums[pt_i].P*nl;
-		if(nl.dot(Vector3(0,0,1))<0) nl*=-1;
-		array_gt[2*pt_i+0] = nl[0];
-		array_gt[2*pt_i+1] = nl[1];
-    }
-
-	return point_ids.size();
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void 
-NormEst::loadXYZ(const std::string& filename)
-{
-	std::ifstream istr(filename.c_str());
-	std::vector<Eigen::Vector3d> points;
-	std::string line;
-	double x,y,z;
-	while(getline(istr, line))
-	{
-		std::stringstream sstr("");
-		sstr << line;
-		sstr >> x >> y >> z;
-		points.push_back(Eigen::Vector3d(x,y,z));
-	}
-	istr.close();
-	_pc.resize(points.size(),3);
-	for(uint i=0; i<points.size(); i++)
-	{
-		_pc.row(i) = points[i];
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void 
-NormEst::saveXYZ(const std::string& filename)
-{
-	std::ofstream ofs(filename.c_str());
-	for(int i=0; i<_pc.rows(); i++){
-		ofs << _pc(i,0) << " ";
-		ofs << _pc(i,1) << " ";
-		ofs << _pc(i,2) << " ";
-		ofs << _normals(i,0) << " ";
-		ofs << _normals(i,1) << " ";
-		ofs << _normals(i,2) << std::endl;
-	}
-	ofs.close();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
