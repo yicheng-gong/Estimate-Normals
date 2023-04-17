@@ -1,12 +1,29 @@
 #include "houghCNN.h"
- 
-int NormEst::size(){
-	return _pc.rows();
+
+///////////////////////////////////////////////////////////////////////////////
+
+void 
+NormEst::setKs(int* array, int m)
+{
+	Ks.resize(m);
+	for (int i = 0; i < m; i++)
+	{
+		Ks[i] = array[i];
+	}
 }
 
-int NormEst::size_normals(){
-	return _normals.rows();
+///////////////////////////////////////////////////////////////////////////////
+
+void 
+NormEst::getKs(int* array, int m)
+{
+    for (int i = 0; i < m; i++)
+	{
+		array[i] = Ks[i];
+	}
 }
+
+///////////////////////////////////////////////////////////////////////////////
 
 inline void fill_accum_aniso(HoughAccum& hd, std::vector<long int>& nbh, int nbh_size,
 		const NormEst* est, unsigned int& randPos,
@@ -21,7 +38,7 @@ inline void fill_accum_aniso(HoughAccum& hd, std::vector<long int>& nbh, int nbh
 	int& A = hd.A;
 
 	//init
-	A = est->get_A();
+	A = est->getA();
 	accum_vec = MatrixX3::Zero(A*A,3);
 	accum = VectorX::Zero(A*A);
 	Vector3 mean = Vector3::Zero();
@@ -29,7 +46,7 @@ inline void fill_accum_aniso(HoughAccum& hd, std::vector<long int>& nbh, int nbh
 
 	//other refs
 	const MatrixX3& _pc = est->pc();
-	const int T = est->get_T();
+	const int T = est->getT();
 	const std::vector<unsigned int>& rand_ints = est->rand_ints;
 
 
@@ -192,7 +209,7 @@ inline void fill_accum_not_aniso(HoughAccum& hd, std::vector<long int>& nbh, int
 	int& A = hd.A;
 
 	//init
-	A = est->get_A();
+	A = est->getA();
 	accum_vec = MatrixX3::Zero(A*A,3);
 	accum = VectorX::Zero(A*A);
 	Vector3 mean = Vector3::Zero();
@@ -200,7 +217,7 @@ inline void fill_accum_not_aniso(HoughAccum& hd, std::vector<long int>& nbh, int
 
 	//other refs
 	const MatrixX3& _pc = est->pc();
-	const int T = est->get_T();
+	int T = est->getT();
 	const std::vector<unsigned int>& rand_ints = est->rand_ints;
 
 	//regression
@@ -323,8 +340,11 @@ inline void sort_indices_by_distances(std::vector<long int>& indices, const std:
     }
 }
 
-void NormEst::initialize(){
+///////////////////////////////////////////////////////////////////////////////
 
+void 
+NormEst::initialize()
+{
     // compute max K
     maxK = 0;
     for(uint i=0; i<Ks.size(); i++)
@@ -374,7 +394,11 @@ void NormEst::initialize(){
     randPos = 0;
 }
 
-void NormEst::get_batch(int batch_id, int batch_size, double* array) { // array batch_size, Ks.size, A, A
+///////////////////////////////////////////////////////////////////////////////
+
+void 
+NormEst::getBatch(int batch_id, int batch_size, double* array) 
+{ // array batch_size, Ks.size, A, A
 
     accums.resize(batch_size);
 
@@ -431,8 +455,11 @@ void NormEst::get_batch(int batch_id, int batch_size, double* array) { // array 
 
 }
 
-void NormEst::set_batch(int batch_id, int batch_size, double* array){
+///////////////////////////////////////////////////////////////////////////////
 
+void 
+NormEst::setBatch(int batch_id, int batch_size, double* array)
+{
     // fill the normal
     #pragma omp parallel for
     for(int pt_id=batch_id; pt_id<batch_id+batch_size; pt_id++){
@@ -454,8 +481,11 @@ void NormEst::set_batch(int batch_id, int batch_size, double* array){
     }
 }
 
-void NormEst::get_points(double* array, int m, int n) {
+///////////////////////////////////////////////////////////////////////////////
 
+void 
+NormEst::getPoints(double* array, int m, int n) 
+{
     int i, j ;
     int index = 0 ;
 
@@ -468,8 +498,10 @@ void NormEst::get_points(double* array, int m, int n) {
     return ;
 }
 
-void NormEst::get_normals(double* array, int m, int n) {
+///////////////////////////////////////////////////////////////////////////////
 
+void NormEst::getNormals(double* array, int m, int n) 
+{
     int i, j ;
     int index = 0 ;
 
@@ -482,7 +514,10 @@ void NormEst::get_normals(double* array, int m, int n) {
     return ;
 }
 
-void NormEst::set_points(double* array, int m, int n){
+///////////////////////////////////////////////////////////////////////////////
+
+void NormEst::setPoints(double* array, int m, int n)
+{
     // resize the point cloud
     _pc.resize(m,3);
 
@@ -498,7 +533,11 @@ void NormEst::set_points(double* array, int m, int n){
     return ;
 }
 
-void NormEst::set_normals(double* array, int m, int n){
+///////////////////////////////////////////////////////////////////////////////
+
+void 
+NormEst::setNormals(double* array, int m, int n)
+{
     // resize the point cloud
     _normals.resize(m,3);
 
@@ -512,37 +551,6 @@ void NormEst::set_normals(double* array, int m, int n){
         }
     }
     return ;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void 
-NormEst::set_Ks(int* array, int m)
-{
-	Ks.resize(m);
-	for (int i = 0; i < m; i++)
-	{
-		Ks[i] = array[i];
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-int 
-NormEst::get_Ks_size()
-{
-	return Ks.size();
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-void 
-NormEst::get_Ks(int* array, int m)
-{
-    for (int i = 0; i < m; i++)
-	{
-		array[i] = Ks[i];
-	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -740,8 +748,11 @@ void add_gaussian_noise_percentage(Eigen::MatrixX3d& pc, int percentage){
 
 }
 
-int NormEst::generate_training_accum_random_corner(int noise_val, int n_points, double* array, double* array_gt){
+///////////////////////////////////////////////////////////////////////////////
 
+int 
+NormEst::generateTrainAccRandomCorner(int noise_val, int n_points, double* array, double* array_gt)
+{
 	K_aniso = 5;
 	T = 1000;
 	A = 33;
@@ -854,3 +865,45 @@ int NormEst::generate_training_accum_random_corner(int noise_val, int n_points, 
 	return point_ids.size();
 }
 
+///////////////////////////////////////////////////////////////////////////////
+
+void 
+NormEst::loadXYZ(const std::string& filename)
+{
+	std::ifstream istr(filename.c_str());
+	std::vector<Eigen::Vector3d> points;
+	std::string line;
+	double x,y,z;
+	while(getline(istr, line))
+	{
+		std::stringstream sstr("");
+		sstr << line;
+		sstr >> x >> y >> z;
+		points.push_back(Eigen::Vector3d(x,y,z));
+	}
+	istr.close();
+	_pc.resize(points.size(),3);
+	for(uint i=0; i<points.size(); i++)
+	{
+		_pc.row(i) = points[i];
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+void 
+NormEst::saveXYZ(const std::string& filename)
+{
+	std::ofstream ofs(filename.c_str());
+	for(int i=0; i<_pc.rows(); i++){
+		ofs << _pc(i,0) << " ";
+		ofs << _pc(i,1) << " ";
+		ofs << _pc(i,2) << " ";
+		ofs << _normals(i,0) << " ";
+		ofs << _normals(i,1) << " ";
+		ofs << _normals(i,2) << std::endl;
+	}
+	ofs.close();
+}
+
+///////////////////////////////////////////////////////////////////////////////

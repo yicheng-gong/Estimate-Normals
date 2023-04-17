@@ -61,7 +61,7 @@ class NormEst{
 		 *
 		 */
 		void 
-		set_Ks(int* array, int m);
+		setKs(int* array, int m);
 
 		/** \brief Compute the size of Ks 
 		 *
@@ -70,7 +70,7 @@ class NormEst{
 		 * \return size of Ks
 		 */
 		int 
-		get_Ks_size();
+		getKsSize() {return Ks.size();};
 
 		/** \brief Compute Ks
 		 *
@@ -78,7 +78,195 @@ class NormEst{
 		 *
 		 */
 		void 
-		get_Ks(int* array, int m);
+		getKs(int* array, int m);
+
+		/** \brief MoveIt function for moving arm to pick and  place an object 
+		 *
+		 * \input[in] desired object  position
+		 *
+		 * \return true if the action is correct
+		 */
+		bool 
+		getDensitySensitive() {return use_aniso;};
+
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		setDensitySensitive(bool d_s) {use_aniso=d_s;};
+
+		/** \brief Compute the size of Ks 
+		 *
+		 * \input[in] none
+		 *
+		 * \return size of Ks
+		 */
+		int 
+		getPCSize() {return _pc.rows();};
+
+		/** \brief Compute the size of Ks 
+		 *
+		 * \input[in] none
+		 *
+		 * \return size of Ks
+		 */
+		int 
+		getPCNormalsSize() {return _normals.rows();};
+
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		initialize();
+
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		getBatch(int batch_id, int batch_size, double* array);
+
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		setBatch(int batch_id, int batch_size, double* array);
+
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		setT(int T_) {T=T_;};
+
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		setKaniso(int Kaniso) {K_aniso=Kaniso;};
+
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		setA(int A_){A = A_;}
+
+		/** \brief Compute the size of Ks 
+		 *
+		 * \input[in] none
+		 *
+		 * \return size of Ks
+		 */
+		const int 
+		getT()const {return T;}
+
+        /** \brief Compute the size of Ks 
+		 *
+		 * \input[in] none
+		 *
+		 * \return size of Ks
+		 */
+		const int 
+		getKaniso() const {return K_aniso;}
+
+		/** \brief Compute the size of Ks 
+		 *
+		 * \input[in] none
+		 *
+		 * \return size of Ks
+		 */
+		const int 
+		getA() const{return A;}
+
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		getPoints(double* array, int m, int n);
+
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		getNormals(double* array, int m, int n);
+
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		setPoints(double* array, int m, int n);
+
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		setNormals(double* array, int m, int n);
+
+		/** \brief Compute the size of Ks 
+		 *
+		 * \input[in] none
+		 *
+		 * \return size of Ks
+		 */
+		const MatrixX3& 
+		pc() const{return _pc;}
+
+        /** \brief Compute the size of Ks 
+		 *
+		 * \input[in] none
+		 *
+		 * \return size of Ks
+		 */
+		MatrixX3& 
+		normals(){return _normals;}
+
+		/** \brief Compute the size of Ks 
+		 *
+		 * \input[in] none
+		 *
+		 * \return size of Ks
+		 */
+		int 
+		generateTrainAccRandomCorner(int noise_val, int n_points, double* array, double* array_gt);
+		
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		loadXYZ(const std::string& filename);
+
+		
+		/** \brief Compute Ks
+		 *
+		 * \input[in] 
+		 *
+		 */
+		void 
+		saveXYZ(const std::string& filename);
+
+		
 
 
 
@@ -107,77 +295,13 @@ class NormEst{
 		std::vector<int> Ks; // TODO
 
 		bool use_aniso; // TODO
-		bool get_density_sensitive(){return use_aniso;}
-		void set_density_sensitive(bool d_s){use_aniso=d_s;}
 
 		int maxK;
 		kd_tree* tree;
 		bool is_tree_initialized=false;
 		unsigned int randPos;
 		std::vector<HoughAccum> accums;
-
-		void initialize();
-		void get_batch(int batch_id, int batch_size, double* array);
-		void set_batch(int batch_id, int batch_size, double* array);
-
 		std::vector<unsigned int> rand_ints;
-
-
-		int size();
-		int size_normals();
-
-		int estimate(const std::string& model, const std::vector<int>& Ks, bool use_aniso);
-
-		void set_T(int T_){T=T_;}
-		void set_K_aniso(int Kaniso){K_aniso=Kaniso;}
-		void set_A(int A_){A=A_;}
-
-		const int get_T()const {return T;}
-		const int get_K_aniso() const {return K_aniso;}
-		const int get_A() const{return A;}
-
-		void get_points(double* array, int m, int n);
-		void get_normals(double* array, int m, int n);
-		void set_points(double* array, int m, int n);
-		void set_normals(double* array, int m, int n);
-
-		const MatrixX3& pc() const{return _pc;}
-		MatrixX3& normals(){return _normals;}
-
-
-
-		// io
-		void loadXYZ(const std::string& filename){
-			std::ifstream istr(filename.c_str());
-			std::vector<Eigen::Vector3d> points;
-			std::string line;
-			double x,y,z;
-			while(getline(istr, line))
-			{
-				std::stringstream sstr("");
-				sstr << line;
-				sstr >> x >> y >> z;
-				points.push_back(Eigen::Vector3d(x,y,z));
-			}
-			istr.close();
-			_pc.resize(points.size(),3);
-			for(uint i=0; i<points.size(); i++){
-				_pc.row(i) = points[i];
-			}
-		}
-
-		void saveXYZ(const std::string& filename){
-			std::ofstream ofs(filename.c_str());
-			for(int i=0; i<_pc.rows(); i++){
-				ofs << _pc(i,0) << " ";
-				ofs << _pc(i,1) << " ";
-				ofs << _pc(i,2) << " ";
-				ofs << _normals(i,0) << " ";
-				ofs << _normals(i,1) << " ";
-				ofs << _normals(i,2) << std::endl;
-			}
-			ofs.close();
-		}
 
 
 		int generate_training_accum_random_corner(int noise_val, int n_points, double* array, double* array_gt);

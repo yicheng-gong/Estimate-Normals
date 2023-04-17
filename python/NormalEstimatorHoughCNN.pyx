@@ -34,35 +34,35 @@ cdef extern from "houghCNN.h":
         void loadXYZ(string)
         void saveXYZ(string)
 
-        void get_points(double*, int,int)
-        void set_points(double*, int, int)
-        void get_normals(double*, int,int)
-        void set_normals(double*, int, int)
+        void getPoints(double*, int,int)
+        void setPoints(double*, int, int)
+        void getNormals(double*, int,int)
+        void setNormals(double*, int, int)
 
-        int size()
-        int size_normals()
+        int getPCSize()
+        int getPCNormalsSize()
 
-        int get_T()
-        void set_T(int)
+        int getT()
+        void setT(int)
 
-        int get_A()
-        void set_A(int)
+        int getA()
+        void setA(int)
 
-        int get_density_sensitive()
-        void set_density_sensitive(bool)
+        int getDensitySensitive()
+        void setDensitySensitive(bool)
 
-        int get_K_aniso()
-        void set_K_aniso(int)
+        int getKaniso()
+        void setKaniso(int)
 
         void initialize()
-        void get_batch(int,int, double*)
-        void set_batch(int,int, double*)
+        void getBatch(int,int, double*)
+        void setBatch(int,int, double*)
 
-        void get_Ks(int*,int)
-        void set_Ks(int*, int)
-        int get_Ks_size()
+        void getKs(int*,int)
+        void setKs(int*, int)
+        int getKsSize()
 
-        int generate_training_accum_random_corner(int,int, double*, double*)
+        int generateTrainAccRandomCorner(int,int, double*, double*)
 
 
 
@@ -81,101 +81,101 @@ cdef class NormalEstimatorHoughCNN:
     cpdef saveXYZ(self,filename):
         self.thisptr.saveXYZ(str.encode(filename))
 
-    cpdef size(self):
-        return self.thisptr.size()
+    cpdef getPCSize(self):
+        return self.thisptr.getPCSize()
 
-    cpdef size_normals(self):
-        return self.thisptr.size_normals()
+    cpdef getPCNormalsSize(self):
+        return self.thisptr.getPCNormalsSize()
 
-    cpdef get_T(self):
-        return self.thisptr.get_T()
-    cpdef set_T(self, T):
-        self.thisptr.set_T(T)
+    cpdef getT(self):
+        return self.thisptr.getT()
+    cpdef setT(self, T):
+        self.thisptr.setT(T)
 
-    cpdef get_A(self):
-        return self.thisptr.get_A()
-    cpdef set_A(self, A):
-        self.thisptr.set_A(A)
+    cpdef getA(self):
+        return self.thisptr.getA()
+    cpdef setA(self, A):
+        self.thisptr.setA(A)
 
-    cpdef get_density_sensitive(self):
-        return self.thisptr.get_density_sensitive()
-    cpdef set_density_sensitive(self, d_s):
-        self.thisptr.set_density_sensitive(d_s)
+    cpdef getDensitySensitive(self):
+        return self.thisptr.getDensitySensitive()
+    cpdef setDensitySensitive(self, d_s):
+        self.thisptr.setDensitySensitive(d_s)
 
     cpdef get_K_density(self):
-        return self.thisptr.get_K_aniso()
+        return self.thisptr.getKaniso()
     cpdef set_K_density(self, K_d):
-        self.thisptr.set_K_aniso(K_d)
+        self.thisptr.setKaniso(K_d)
 
-    def get_Ks(self):
+    def getKs(self):
         cdef m
-        m = self.get_Ks_size()
+        m = self.getKsSize()
         d = np.zeros(m, dtype = np.int32)
         cdef np.ndarray[np.int32_t, ndim=1] d2 = d
-        self.thisptr.get_Ks(<int *> d2.data, m)
+        self.thisptr.getKs(<int *> d2.data, m)
         return d
 
-    def get_Ks_size(self):
-        return self.thisptr.get_Ks_size()
+    def getKsSize(self):
+        return self.thisptr.getKsSize()
 
-    def set_Ks(self, Ks):
+    def setKs(self, Ks):
         cdef np.ndarray[np.int32_t, ndim = 1] d2 = Ks.astype(np.int32)
-        self.thisptr.set_Ks(<int *> d2.data, Ks.shape[0])
+        self.thisptr.setKs(<int *> d2.data, Ks.shape[0])
 
-    def get_points(self):
+    def getPoints(self):
         cdef int m, n
-        m = self.size()
+        m = self.getPCSize()
         n = 3
         d = np.zeros((m,n),dtype=np.double)
         cdef np.ndarray[np.float64_t, ndim = 2] d2 = d
-        self.thisptr.get_points(<double *> d2.data, m,n)
+        self.thisptr.getPoints(<double *> d2.data, m,n)
         return d
 
-    def get_normals(self):
+    def getNormals(self):
         cdef int m, n
-        m = self.size()
+        m = self.getPCSize()
         n = 3
         d = np.zeros((m,n),dtype=np.double)
         cdef np.ndarray[np.float64_t, ndim = 2] d2 = d
-        self.thisptr.get_normals(<double *> d2.data, m,n)
+        self.thisptr.getNormals(<double *> d2.data, m,n)
         return d
 
     def initialize(self):
         self.thisptr.initialize()
 
-    def get_batch(self, pt_id, batch_size):
+    def getBatch(self, pt_id, batch_size):
         cdef int ptid, bs, ks, A
         ptid = pt_id
         bs=batch_size
-        ks= self.get_Ks_size()
-        A = self.get_A()
+        ks= self.getKsSize()
+        A = self.getA()
         d = np.zeros((bs,ks,A,A), dtype=np.double)
         cdef np.ndarray[np.float64_t, ndim = 4] d2 = d
-        self.thisptr.get_batch(ptid, bs, <double *> d2.data)
+        self.thisptr.getBatch(ptid, bs, <double *> d2.data)
         return d
 
-    def set_batch(self, pt_id, batch_size, batch):
+    def setBatch(self, pt_id, batch_size, batch):
         cdef np.ndarray[np.float64_t, ndim = 2] d2 = batch
-        self.thisptr.set_batch(pt_id, batch_size, <double *> d2.data)
+        self.thisptr.setBatch(pt_id, batch_size, <double *> d2.data)
 
 
-    def set_points(self, points):
+    def setPoints(self, points):
         cdef np.ndarray[np.float64_t, ndim = 2] d2 = points
-        self.thisptr.set_points(<double *> d2.data, points.shape[0], points.shape[1])
+        self.thisptr.setPoints(<double *> d2.data, points.shape[0], points.shape[1])
 
-    def set_normals(self, normals):
+    def setNormals(self, normals):
         cdef np.ndarray[np.float64_t, ndim = 2] d2 = normals
-        self.thisptr.set_normals(<double *> d2.data, normals.shape[0], normals.shape[1])
+        self.thisptr.setNormals(<double *> d2.data, normals.shape[0], normals.shape[1])
 
-    def generate_training_accum_random_corner(self, n_points, noise_val=-1):
+    def generateTrainAccRandomCorner(self, n_points, noise_val=-1):
         cdef int npt, ks, A, nv
         npt = n_points
         nv = noise_val
-        ks= self.get_Ks_size()
-        A = self.get_A()
+        ks= self.getKsSize()
+        A = self.getA()
         d = np.zeros((npt,ks,A,A), dtype=np.double)
         t = np.zeros((npt,2), dtype=np.double)
         cdef np.ndarray[np.float64_t, ndim = 4] d2 = d
         cdef np.ndarray[np.float64_t, ndim = 2] t2 = t
-        nbr = self.thisptr.generate_training_accum_random_corner(nv,npt, <double *> d2.data, <double *> t2.data)
+        nbr = self.thisptr.generateTrainAccRandomCorner(nv,npt, <double *> d2.data, <double *> t2.data)
         return nbr, d,t

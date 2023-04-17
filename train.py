@@ -16,7 +16,7 @@ def dataset_create(dataset_path, dataset_name, dataset_size, scale_number, batch
     dataset = np.zeros((dataset_size, scale_number, 33,33))
     targets = np.zeros((dataset_size, 2))
     for i in tqdm(range(0,dataset_size, batch_size), ncols=80):
-        nbr, batch, batch_targets = estimator.generate_training_accum_random_corner(batch_size)
+        nbr, batch, batch_targets = estimator.generateTrainAccRandomCorner(batch_size)
         if count+nbr > dataset_size:
             nbr = dataset_size - count
         dataset[count:count+nbr] = batch[0:nbr]
@@ -66,7 +66,7 @@ if __name__ == "__main__":
         Ks=np.array([K,K/4,K/2,K*2,K*4], dtype=int)
         import models.model_5s as model_def
         model_result_path = "model_5s"
-    estimator.set_Ks(Ks)
+    estimator.setKs(Ks)
     net = model_def.create_model()
 
     # configure dataset
