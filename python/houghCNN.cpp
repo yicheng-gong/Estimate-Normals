@@ -52,6 +52,8 @@ NormEst::initialize()
 	tree = new kd_tree(3, _pc, 10 /* max leaf */ );
 	tree->index->buildIndex();
 
+	EstimationTools et;
+
     // estimate the probas
     if(use_aniso){
     	proba_vector.resize(N);
@@ -63,7 +65,7 @@ NormEst::initialize()
     		//get the neighborhood
     		std::vector<long int> indices;
     		std::vector<double> distances;
-    		searchKNN(*tree,pt,K_aniso, indices, distances);
+    		et.searchKNN(*tree,pt,K_aniso, indices, distances);
 
     		float md = 0;
     		for(uint i=0; i<distances.size(); i++)
@@ -85,6 +87,8 @@ NormEst::getBatch(int batch_id, int batch_size, double* array)
 
     accums.resize(batch_size);
 
+	EstimationTools et;
+
     // create forward tensor
     unsigned int randPos2 = randPos;
     //#pragma omp parallel for firstprivate(randPos2)
@@ -97,43 +101,26 @@ NormEst::getBatch(int batch_id, int batch_size, double* array)
         //get the max neighborhood
         std::vector<long int> indices;
         std::vector<double> distances;
-        searchKNN(*tree,pt,maxK, indices, distances);
+        et.searchKNN(*tree,pt,maxK, indices, distances);
 
         // for knn search distances appear to be sorted
-        sort_indices_by_distances(indices, distances);
+        et.sortIndicesByDistances(indices, distances);
 
-        if(use_aniso){
-            for(uint k_id=0; k_id<Ks.size(); k_id++){
-                //fill the patch and get the rotation matrix
-                HoughAccum hd;
-                if(k_id==0){
-                    fill_accum_aniso(hd,indices,Ks[k_id], this, randPos2, proba_vector);
-                    accums[pt_id-batch_id] = hd;
-                }else{
-                    fill_accum_aniso(hd,indices,Ks[k_id], this, randPos2,  proba_vector, false, accums[pt_id-batch_id].P);
-                }
+		for(uint k_id=0; k_id<Ks.size(); k_id++){
+			//fill the patch and get the rotation matrix
+			HoughAccum hd;
+			if(k_id==0){
+				et.fillAccum(hd,indices,Ks[k_id], this, randPos2, proba_vector, use_aniso);
+				accums[pt_id-batch_id] = hd;
+			}else{
+				et.fillAccum(hd,indices,Ks[k_id], this, randPos2,  proba_vector, use_aniso, false, accums[pt_id-batch_id].P);
+			}
 
-                for(int i=0; i<A*A; i++){
-                    array[A*A*Ks.size()*(pt_id-batch_id)+ A*A*k_id +i] = hd.accum[i];
-                }
-            }
-        }else{
-
-            for(uint k_id=0; k_id<Ks.size(); k_id++){
-                //fill the patch and get the rotation matrix
-                HoughAccum hd;
-                if(k_id==0){
-                    fill_accum_not_aniso(hd,indices,Ks[k_id], this, randPos);
-                    accums[pt_id-batch_id] = hd;
-                }else{
-                    fill_accum_not_aniso(hd,indices,Ks[k_id], this, randPos, false, accums[pt_id-batch_id].P);
-                }
-
-                for(int i=0; i<A*A; i++){
-                    array[A*A*Ks.size()*(pt_id-batch_id)+ A*A*k_id +i] = hd.accum[i];
-                }
-            }
-        }
+			for(int i=0; i<A*A; i++){
+				array[A*A*Ks.size()*(pt_id-batch_id)+ A*A*k_id +i] = hd.accum[i];
+			}
+		}
+        
     }
 
 }
@@ -251,6 +238,8 @@ NormEst::generateTrainAccRandomCorner(int noise_val, int n_points, double* array
     double angle_min = 0.2; // min angle of the points cloud
 	double max_square_dist = 0.02; // maximal square dist to accept point (be sure it include a corner or an edge)
 
+	EstimationTools et;
+
 	// generate angle point cloud
 	double angle = (rand()+0.)/RAND_MAX;
 	angle = angle*(angle_max-angle_min)+angle_min;
@@ -260,9 +249,9 @@ NormEst::generateTrainAccRandomCorner(int noise_val, int n_points, double* array
 		noise = noise_val;
 	}
 	MatrixX3 normals_gt;
-	create_angle(_pc, normals_gt, angle, N);
-	random_rotation(_pc, normals_gt);
-	add_gaussian_noise_percentage(_pc, noise);
+	et.createAngle(_pc, normals_gt, angle, N);
+	et.randomRotation(_pc, normals_gt);
+	et.addGaussianNoisePercentage(_pc, noise);
 
 	// TODO
 	//set_Ks(Ks);
@@ -305,43 +294,26 @@ NormEst::generateTrainAccRandomCorner(int noise_val, int n_points, double* array
         //get the max neighborhood
         std::vector<long int> indices;
         std::vector<double> distances;
-        searchKNN(*tree,pt,maxK, indices, distances);
+        et.searchKNN(*tree,pt,maxK, indices, distances);
 
         // for knn search distances appear to be sorted
-        sort_indices_by_distances(indices, distances);
+        et.sortIndicesByDistances(indices, distances);
 
-        if(use_aniso){
-            for(uint k_id=0; k_id<Ks.size(); k_id++){
-                //fill the patch and get the rotation matrix
-                HoughAccum hd;
-                if(k_id==0){
-                    fill_accum_aniso(hd,indices,Ks[k_id], this, randPos2, proba_vector);
-                    accums[pt_i] = hd;
-                }else{
-                    fill_accum_aniso(hd,indices,Ks[k_id], this, randPos2,  proba_vector, false, accums[pt_i].P);
-                }
+		for(uint k_id=0; k_id<Ks.size(); k_id++){
+			//fill the patch and get the rotation matrix
+			HoughAccum hd;
+			if(k_id==0){
+				et.fillAccum(hd,indices,Ks[k_id], this, randPos2, proba_vector, use_aniso);
+				accums[pt_i] = hd;
+			}else{
+				et.fillAccum(hd,indices,Ks[k_id], this, randPos2,  proba_vector, use_aniso, false, accums[pt_i].P);
+			}
 
-                for(int i=0; i<A*A; i++){
-                    array[A*A*Ks.size()*(pt_i)+ A*A*k_id +i] = hd.accum[i];
-                }
-            }
-        }else{
-
-            for(uint k_id=0; k_id<Ks.size(); k_id++){
-                //fill the patch and get the rotation matrix
-                HoughAccum hd;
-                if(k_id==0){
-                    fill_accum_not_aniso(hd,indices,Ks[k_id], this, randPos2);
-                    accums[pt_i] = hd;
-                }else{
-                    fill_accum_not_aniso(hd,indices,Ks[k_id], this, randPos2, false, accums[pt_i].P);
-                }
-
-                for(int i=0; i<A*A; i++){
-                    array[A*A*Ks.size()*(pt_i)+ A*A*k_id +i] = hd.accum[i];
-                }
-            }
-        }
+			for(int i=0; i<A*A; i++){
+				array[A*A*Ks.size()*(pt_i)+ A*A*k_id +i] = hd.accum[i];
+			}
+		}
+        
 		Vector3 nl = normals_gt.row(pt_id).transpose();
 		nl.normalize();
 		nl = accums[pt_i].P*nl;
@@ -396,11 +368,12 @@ NormEst::saveXYZ(const std::string& filename)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-inline void 
-fill_accum_aniso(HoughAccum& hd, std::vector<long int>& nbh, int nbh_size,
+void 
+EstimationTools::fillAccum(HoughAccum& hd, std::vector<long int>& nbh, int nbh_size,
 				const NormEst* est, unsigned int& randPos,
 				const std::vector<float>& proba_vector,
-				bool compute_P = true, Matrix3 P_ref=Matrix3())
+				bool use_aniso,
+				bool compute_P, Matrix3 P_ref)
 {
 
 	//references
@@ -425,21 +398,35 @@ fill_accum_aniso(HoughAccum& hd, std::vector<long int>& nbh, int nbh_size,
 
 
 	//regression
-	float mean_sum = 0;
-	for(int i=0; i<nbh_size; i++){
-		const Vector3& v =  proba_vector[nbh[i]] * _pc.row(nbh[i]);
-		mean+=v;
-		mean_sum+=proba_vector[nbh[i]] ;
-	}
-	mean /= mean_sum;
+	if (use_aniso){
+		float mean_sum = 0;
+		for(int i=0; i<nbh_size; i++){
+			const Vector3& v =  proba_vector[nbh[i]] * _pc.row(nbh[i]);
+			mean+=v;
+			mean_sum+=proba_vector[nbh[i]] ;
+		}
+		mean /= mean_sum;
 
-	float cov_sum = 0;
-	for(int i=0; i<nbh_size; i++){
-		Vector3 v =  _pc.row(nbh[i]).transpose()-mean;
-		cov+= v*v.transpose()*proba_vector[nbh[i]]*proba_vector[nbh[i]];
-		cov_sum += proba_vector[nbh[i]]*proba_vector[nbh[i]];
+		float cov_sum = 0;
+		for(int i=0; i<nbh_size; i++){
+			Vector3 v =  _pc.row(nbh[i]).transpose()-mean;
+			cov+= v*v.transpose()*proba_vector[nbh[i]]*proba_vector[nbh[i]];
+			cov_sum += proba_vector[nbh[i]]*proba_vector[nbh[i]];
+		}
+		cov /= cov_sum;
+	}else{
+		for(int i=0; i<nbh_size; i++){
+			const Vector3& v =  _pc.row(nbh[i]);
+			mean+=v;
+		}
+		mean /= nbh_size;
+
+		for(int i=0; i<nbh_size; i++){
+			Vector3 v =  _pc.row(nbh[i]).transpose()-mean;
+			cov+= v*v.transpose();
+		}
 	}
-	cov /= cov_sum;
+	
 
 	Eigen::JacobiSVD<Matrix3> svd(cov, Eigen::ComputeFullV);
 	if(compute_P){
@@ -447,37 +434,41 @@ fill_accum_aniso(HoughAccum& hd, std::vector<long int>& nbh, int nbh_size,
 	}else{
 		P = P_ref;
 	}
+
 	//Vector3 nor_reg = P.row(2);
-
-
-    float min_prob = 1e7;
-    float max_prob = -1e7;
-    for(int i=0; i<nbh_size; i++){
-        if(min_prob > proba_vector[nbh[i]]) min_prob = proba_vector[nbh[i]];
-        if(max_prob < proba_vector[nbh[i]]) max_prob = proba_vector[nbh[i]];
-    }
-    if(max_prob == min_prob)
-        max_prob += 1;
-
-
-    int segNbr = 5;
-    std::vector<float> sums(segNbr,0);
-    std::vector<std::vector<int> > seg_nbh(segNbr);
-    for(int i=0; i<nbh_size; i++){
-        int pos = std::min(segNbr-1, int((proba_vector[nbh[i]]-min_prob)/(max_prob-min_prob)*segNbr));
-        seg_nbh[pos].push_back(i);
-        sums[pos] += proba_vector[nbh[i]];
-    }
-
-	// create the cumulative vector
+	int segNbr = 5;
+	std::vector<float> sums(segNbr,0);
+	std::vector<std::vector<int> > seg_nbh(segNbr);
 	std::vector<float> cumulative_proba(segNbr);
-	cumulative_proba[0] = sums[0];
-	for(int i=1; i<segNbr; i++){
-		cumulative_proba[i] = sums[i] + cumulative_proba[i-1];
+	if (use_aniso){
+		float min_prob = 1e7;
+		float max_prob = -1e7;
+		for(int i=0; i<nbh_size; i++){
+			if(min_prob > proba_vector[nbh[i]]) min_prob = proba_vector[nbh[i]];
+			if(max_prob < proba_vector[nbh[i]]) max_prob = proba_vector[nbh[i]];
+		}
+		if(max_prob == min_prob)
+			max_prob += 1;
+
+
+		
+		for(int i=0; i<nbh_size; i++){
+			int pos = std::min(segNbr-1, int((proba_vector[nbh[i]]-min_prob)/(max_prob-min_prob)*segNbr));
+			seg_nbh[pos].push_back(i);
+			sums[pos] += proba_vector[nbh[i]];
+		}
+
+		// create the cumulative vector
+		
+		cumulative_proba[0] = sums[0];
+		for(int i=1; i<segNbr; i++){
+			cumulative_proba[i] = sums[i] + cumulative_proba[i-1];
+		}
+		for(int i=0; i<segNbr; i++){
+			cumulative_proba[i] /= cumulative_proba[segNbr-1];
+		}
 	}
-	for(int i=0; i<segNbr; i++){
-		cumulative_proba[i] /= cumulative_proba[segNbr-1];
-	}
+    
 
 
 	std::vector<Vector3> accum_points;
@@ -487,26 +478,33 @@ fill_accum_aniso(HoughAccum& hd, std::vector<long int>& nbh, int nbh_size,
 		do{
 			for(uint j=0; j<pt_ids.size(); j++){
 
-				// select a point
-				float pos = float(rand_ints[randPos])/RAND_MAX;
-                randPos = (randPos+1)%rand_ints.size();
+				
+
+				if(use_aniso){
+					// select a point
+					float pos = float(rand_ints[randPos])/RAND_MAX;
+					randPos = (randPos+1)%rand_ints.size();
+					int seg = 0;
+					for(int i=0; i<segNbr; i++)
+						if(cumulative_proba[i]>=pos){
+							seg = i;
+							break;
+						}
+
+					//seg = lower_bound(cumulative_proba.begin(), cumulative_proba.end(), pos)-cumulative_proba.begin();
 
 
+					pt_ids[j] = seg_nbh[seg][rand_ints[randPos]%seg_nbh[seg].size()];
 
-                int seg = 0;
-                for(int i=0; i<segNbr; i++)
-                    if(cumulative_proba[i]>=pos){
-                        seg = i;
-                        break;
-                    }
+					//pt_ids[j] = rand_ints[randPos]%nbh_size();
+					randPos = (randPos+1)%rand_ints.size();
+				}else{
+					pt_ids[j] = rand_ints[randPos]%nbh_size;
+					randPos = (randPos+1)%rand_ints.size();
 
-                //seg = lower_bound(cumulative_proba.begin(), cumulative_proba.end(), pos)-cumulative_proba.begin();
+				}
 
-
-                pt_ids[j] = seg_nbh[seg][rand_ints[randPos]%seg_nbh[seg].size()];
-
-				//pt_ids[j] = rand_ints[randPos]%nbh_size();
-				randPos = (randPos+1)%rand_ints.size();
+                
 			}
 		}while(pt_ids[0]==pt_ids[1] || pt_ids[1]==pt_ids[2] || pt_ids[2]==pt_ids[0]);
 
@@ -568,124 +566,10 @@ fill_accum_aniso(HoughAccum& hd, std::vector<long int>& nbh, int nbh_size,
 
 }
 
-// not aniso
-inline void fill_accum_not_aniso(HoughAccum& hd, std::vector<long int>& nbh, int nbh_size,
-		const NormEst* est, unsigned int& randPos,
-		bool compute_P = true, Matrix3 P_ref=Matrix3())
-{
-
-	//references
-	VectorX& accum = hd.accum;
-	Matrix3& P = hd.P;
-	MatrixX3 &accum_vec = hd.accum_vec;
-	int& A = hd.A;
-
-	//init
-	A = est->getA();
-	accum_vec = MatrixX3::Zero(A*A,3);
-	accum = VectorX::Zero(A*A);
-	Vector3 mean = Vector3::Zero();
-	Matrix3 cov = Matrix3::Zero();
-
-	//other refs
-	const MatrixX3& _pc = est->pc();
-	int T = est->getT();
-	const std::vector<unsigned int>& rand_ints = est->rand_ints;
-
-	//regression
-	for(int i=0; i<nbh_size; i++){
-		const Vector3& v =  _pc.row(nbh[i]);
-		mean+=v;
-	}
-	mean /= nbh_size;
-
-	for(int i=0; i<nbh_size; i++){
-		Vector3 v =  _pc.row(nbh[i]).transpose()-mean;
-		cov+= v*v.transpose();
-	}
-
-	Eigen::JacobiSVD<Matrix3> svd(cov, Eigen::ComputeFullV);
-	if(compute_P){
-		P =  svd.matrixV().transpose();
-	}else{
-		P = P_ref;
-	}
-	//Vector3 nor_reg = P.row(2);
-
-
-
-	std::vector<Vector3> accum_points;
-	for(int i=0; i<T; i++){
-		//get a triplet of points in the neighborhood
-		std::vector<int> pt_ids(3);
-		do{
-			for(uint j=0; j<pt_ids.size(); j++){
-
-				pt_ids[j] = rand_ints[randPos]%nbh_size;
-				randPos = (randPos+1)%rand_ints.size();
-			}
-		}while(pt_ids[0]==pt_ids[1] || pt_ids[1]==pt_ids[2] || pt_ids[2]==pt_ids[0]);
-
-		//normal to plane
-		Vector3 v1 = _pc.row(nbh[pt_ids[1]])-_pc.row(nbh[pt_ids[0]]);
-		Vector3 v2 = _pc.row(nbh[pt_ids[2]])-_pc.row(nbh[pt_ids[0]]);
-
-		Vector3 nl = v1.cross(v2);
-		nl = P*nl;
-		nl.normalize();
-		if(nl.dot(Vector3(0,0,1))<0) nl*=-1; //reorient normal
-		accum_points.push_back(nl);
-	}
-
-	Matrix3 P2;
-	if(compute_P){
-		mean *= 0;
-		for(int i=0; i<T; i++){
-			double c1 = std::max(0.,std::min(1-1e-8,(accum_points[i][0]+1.)/2))*A;
-			double c2 = std::max(0.,std::min(1-1e-8,(accum_points[i][1]+1.)/2))*A;
-			mean+=Vector3(c1,c2,0);
-		}
-		mean /= T;
-		cov*=0;
-		for(int i=0; i<T; i++){
-			double c1 = std::max(0.,std::min(1-1e-8,(accum_points[i][0]+1.)/2))*A;
-			double c2 = std::max(0.,std::min(1-1e-8,(accum_points[i][1]+1.)/2))*A;
-			Vector3 v =  Vector3(c1,c2,0)-mean;
-			cov+= v*v.transpose();
-		}
-		Eigen::JacobiSVD<Matrix3> svd2(cov, Eigen::ComputeFullV);
-		P2 =  svd2.matrixV().transpose();
-		P = P2*P;
-	}
-
-	for(int i=0; i<T; i++){
-
-		Vector3& nl = accum_points[i];
-		if(compute_P)
-			nl = P2*nl; // change coordinate system
-		if(nl.dot(Vector3(0,0,1))<0) nl*=-1; //reorient normal
-		nl.normalize();//normalize
-
-
-
-		// get the position in accum
-		int c1 = std::max(0.,std::min(1-1e-8,(nl[0]+1.)/2.))*A;
-		int c2 = std::max(0.,std::min(1-1e-8,(nl[1]+1.)/2.))*A;
-		//int pos = c1*A + c2;
-		int pos = c1 + c2*A;
-
-		//fill the patch
-		accum[pos] ++;
-		accum_vec.row(pos) += nl;
-	}
-
-	//renorm patch
-	accum /= accum.maxCoeff();
-
-}
 
 //return the square distance to the farthest point
-inline double searchKNN(const kd_tree& tree, const Vector3& pt, int K, std::vector<long int>& indices, std::vector<double>& distances){
+double 
+EstimationTools::searchKNN(const kd_tree& tree, const Vector3& pt, int K, std::vector<long int>& indices, std::vector<double>& distances){
 	indices.resize(K);
 	distances.resize(K);
 	tree.index->knnSearch(&pt[0], K, &indices[0], &distances[0]);
@@ -696,17 +580,16 @@ inline double searchKNN(const kd_tree& tree, const Vector3& pt, int K, std::vect
 }
 
 
-bool compare_pair_int_double(const std::pair<long int,double>& p1, const std::pair<long int,double>& p2){
-    return p1.second < p2.second;
-}
-
-inline void sort_indices_by_distances(std::vector<long int>& indices, const std::vector<double>& distances){
+void 
+EstimationTools::sortIndicesByDistances(std::vector<long int>& indices, const std::vector<double>& distances){
     std::vector<std::pair<long int,double> > v(distances.size());
     for(uint i=0; i<indices.size(); i++){
         v[i].first = indices[i];
         v[i].second = distances[i];
     }
-    sort(v.begin(), v.end(), compare_pair_int_double);
+    sort(v.begin(), v.end(), [](const std::pair<long int, double>& p1, const std::pair<long int, double>& p2){
+		return p1.second < p2.second;
+	});
     for(uint i=0; i<indices.size(); i++){
         indices[i] = v[i].first;
     }
@@ -718,7 +601,8 @@ inline void sort_indices_by_distances(std::vector<long int>& indices, const std:
 // training set generation
 //
 
-void create_angle(Eigen::MatrixX3d& points, Eigen::MatrixX3d& normals, double angle, int nb_points){
+void 
+EstimationTools::createAngle(Eigen::MatrixX3d& points, Eigen::MatrixX3d& normals, double angle, int nb_points){
 	//init the rand machine
 
 	//create the rotation matrices
@@ -845,7 +729,8 @@ void create_angle(Eigen::MatrixX3d& points, Eigen::MatrixX3d& normals, double an
 
 }
 
-void random_rotation(Eigen::MatrixX3d& pc, Eigen::MatrixX3d& normals){
+void 
+EstimationTools::randomRotation(Eigen::MatrixX3d& pc, Eigen::MatrixX3d& normals){
 
 	float theta = (rand()+0.f)/RAND_MAX * 2* 3.14159265f;
 	float phi = (rand()+0.f)/RAND_MAX * 2* 3.14159265f;
@@ -865,7 +750,8 @@ void random_rotation(Eigen::MatrixX3d& pc, Eigen::MatrixX3d& normals){
 
 }
 
-void add_gaussian_noise(Eigen::MatrixX3d& pc, double sigma){
+void 
+EstimationTools::addGaussianNoise(Eigen::MatrixX3d& pc, double sigma){
 
 	for(uint p=0; p<pc.rows();p++){
 
@@ -881,7 +767,8 @@ void add_gaussian_noise(Eigen::MatrixX3d& pc, double sigma){
 
 }
 
-void add_gaussian_noise_percentage(Eigen::MatrixX3d& pc, int percentage){
+void 
+EstimationTools::addGaussianNoisePercentage(Eigen::MatrixX3d& pc, int percentage){
 	//add gaussian noise as a parcentage of the average distance between points
 
 
@@ -903,7 +790,7 @@ void add_gaussian_noise_percentage(Eigen::MatrixX3d& pc, int percentage){
 
 	dist = dist * percentage / 100.;
 	//cout << "Noise scale : " << dist << endl;
-	add_gaussian_noise(pc, dist);
+	addGaussianNoise(pc, dist);
 
 }
 

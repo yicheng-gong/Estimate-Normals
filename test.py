@@ -92,7 +92,6 @@ if __name__ == "__main__":
     # convert model to cuda if needed
     if USE_CUDA:
         model.cuda()
-
     model.eval()
     # iterate over the batches
     with torch.no_grad():
