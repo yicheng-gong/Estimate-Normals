@@ -1,5 +1,5 @@
 # package used
-import python.NormalEstimatorHoughCNN as Estimator
+import normal_estimator_cpp.NormalEstimatorHoughCNN as Estimator
 import numpy as np
 import torch
 from torch.autograd import Variable
@@ -30,8 +30,7 @@ def dataset_create(dataset_path, dataset_name, dataset_size, scale_number, batch
     print(mean.shape)
     dataset = {"input":dataset, "targets":targets, "mean":mean}
     print("  saving")
-    os.makedirs(dataset_path, exist_ok=True)
-    pickle.dump( dataset, open( os.path.join(dataset_path, dataset_name), "wb" ) )
+    pickle.dump(dataset, open(dataset_path, "wb" ))
     print("-->done")
     
 
@@ -56,15 +55,15 @@ if __name__ == "__main__":
     # Ks computing and model selecting
     if scale_number == 1:
         Ks=np.array([K], dtype=int)
-        import models.model_1s as model_def
+        import cnn_models.model_1s as model_def
         model_result_path = "model_1s"
     elif scale_number == 3:
         Ks=np.array([K,K/2,K*2], dtype=int)
-        import models.model_3s as model_def
+        import cnn_models.model_3s as model_def
         model_result_path = "model_3s"
     elif scale_number == 5:
         Ks=np.array([K,K/4,K/2,K*2,K*4], dtype=int)
-        import models.model_5s as model_def
+        import cnn_models.model_5s as model_def
         model_result_path = "model_5s"
     estimator.setKs(Ks)
     net = model_def.create_model()
@@ -72,7 +71,7 @@ if __name__ == "__main__":
     # configure dataset
     dataset_size = 100000
     dataset_path = "dataset"
-    dataset_name = "dataset_" + str(scale_number) + ".p"
+    dataset_name = "dataset_sn" + str(scale_number) + "_bs" + str(batch_size) + "_ds" + str(dataset_size) + ".p"
     if not os.path.exists(dataset_path):
         os.makedirs(dataset_path)
     dataset_path = os.path.join(dataset_path, dataset_name)
@@ -81,7 +80,7 @@ if __name__ == "__main__":
         
     # dataset loading
     print("loading the model")
-    dataset = pickle.load(open(os.path.join(dataset_path, dataset_name), "rb" ))
+    dataset = pickle.load(open(dataset_path, "rb" ))
     dataset["input"] -= dataset["mean"][None,:,:,:]
     input_data = torch.from_numpy(dataset["input"]).float()
     target_data = torch.from_numpy(dataset["targets"]).float()
@@ -105,11 +104,11 @@ if __name__ == "__main__":
         criterion.cuda()
         
     # training result store
-    result_path = "training_result"
+    result_path = "models_reproduced"
     result_path = os.path.join(result_path, model_result_path)
     if not os.path.exists(result_path):
         os.makedirs(result_path)
-    np.savez(os.path.join(result_path, "dataset_mean"), dataset["mean"])
+    np.savez(os.path.join(result_path, "mean"), dataset["mean"])
     f = open(os.path.join(result_path, "training_logs.txt"), "w")
     
     # start train
@@ -156,7 +155,7 @@ if __name__ == "__main__":
         f.flush()
 
         # save the model
-        torch.save(net.state_dict(), os.path.join(result_path, "state_dict.pth"))
+        torch.save(net.state_dict(), os.path.join(result_path, "model.pth"))
 
     f.close()
     

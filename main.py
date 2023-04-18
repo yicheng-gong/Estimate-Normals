@@ -26,9 +26,9 @@ if __name__ == "__main__":
     angle_s5, prob_s5 = nest.evaluate(input_file_name, scale_number = 5)
     
     #plot the figure
-    plt.plot(angle_s1, prob_s1, "scale_number = 1")
-    plt.plot(angle_s3, prob_s3, "scale_number = 3")
-    plt.plot(angle_s5, prob_s5, "scale_number = 5")
+    plt.plot(angle_s1, prob_s1, label = "scale_number = 1")
+    plt.plot(angle_s3, prob_s3, label = "scale_number = 3")
+    plt.plot(angle_s5, prob_s5, label = "scale_number = 5")
     plt.legend()
     plt.xlabel('angle')
     plt.ylabel('prob')

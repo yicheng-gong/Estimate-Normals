@@ -1,5 +1,5 @@
 # package used
-import python.NormalEstimatorHoughCNN as Estimator
+import normal_estimator_cpp.NormalEstimatorHoughCNN as Estimator
 import numpy as np
 from tqdm import *
 import torch
@@ -14,49 +14,63 @@ class normal_Est:
     def __init__(self):
         pass
 
-    def load_model(self,K,scale_number):
-        model_file_name = "state_dict.pth"
-        mean_file_name = "dataset_mean.npz"
+    def load_model(self, K, scale_number, use_paper_model):
+        model_file_name = "model.pth"
+        mean_file_name = "mean.npz"
         if scale_number == 1:
             Ks=np.array([K], dtype=int)
-            import models.model_1s as model_1s
-            traning_result_path = "training_result/model_1s"
-            model = model_1s.load_model(os.path.join(traning_result_path, model_file_name))
-            mean = np.load(os.path.join(traning_result_path, mean_file_name))["arr_0"]
+            import cnn_models.model_1s as model_1s
+            if use_paper_model:
+                model_path = "models_in_paper/model_1s_boulch_SGP2016"
+            else:
+                model_path = "models_reproduced/model_1s"
+            model = model_1s.load_model(os.path.join(model_path, model_file_name))
+            mean = np.load(os.path.join(model_path, mean_file_name))["arr_0"]
         elif scale_number == 3:
             Ks=np.array([K,K/2,K*2], dtype=int)
-            import models.model_3s as model_3s
-            traning_result_path = "training_result/model_3s"
-            model = model_3s.load_model(os.path.join(traning_result_path, model_file_name))
-            mean = np.load(os.path.join(traning_result_path, mean_file_name))["arr_0"]
+            import cnn_models.model_3s as model_3s
+            if use_paper_model:
+                model_path = "models_in_paper/model_3s_boulch_SGP2016"
+            else:
+                model_path = "models_reproduced/model_3s"
+            model = model_3s.load_model(os.path.join(model_path, model_file_name))
+            mean = np.load(os.path.join(model_path, mean_file_name))["arr_0"]
         elif scale_number == 5:
             Ks=np.array([K,K/4,K/2,K*2,K*4], dtype=int)
-            import models.model_5s as model_5s
-            traning_result_path = "training_result/model_5s"
-            model = model_5s.load_model(os.path.join(traning_result_path, model_file_name))
-            mean = np.load(os.path.join(traning_result_path, mean_file_name))["arr_0"]
+            import cnn_models.model_5s as model_5s
+            if use_paper_model:
+                model_path = "models_in_paper/model_5s_boulch_SGP2016"
+            else:
+                model_path = "models_reproduced/model_5s"
+            model = model_5s.load_model(os.path.join(model_path, model_file_name))
+            mean = np.load(os.path.join(model_path, mean_file_name))["arr_0"]
             
         return Ks, model, mean
 
-    def test_save_path(self,scale_number):
+    def estimate_result_path(self, scale_number, use_paper_model):
         if scale_number == 1:
-            test_result_path = "test_result/model_1s"
+            if use_paper_model:
+                est_result_path = "estimate_result/paper_model_1s"
+            else:
+                est_result_path = "estimate_result/model_1s"
         elif scale_number == 3:
-            test_result_path = "test_result/model_3s"
+            if use_paper_model:
+                est_result_path = "estimate_result/paper_model_3s"
+            else:
+                est_result_path = "estimate_result/model_3s"
         elif scale_number == 5:
-            test_result_path = "test_result/model_5s"
-        if not os.path.exists(test_result_path):
-            os.makedirs(test_result_path)
+            if use_paper_model:
+                est_result_path = "estimate_result/paper_model_5s"
+            else:
+                est_result_path = "estimate_result/model_5s"
+        if not os.path.exists(est_result_path):
+            os.makedirs(est_result_path)
         
-        
-        return test_result_path
+        return est_result_path
             
         
-    def est_normal(self,input_file_name, sample_num = 0, K = 256, scale_number = 1, batch_size = 256):
+    def est_normal(self, input_file_name, sample_num = 0, K = 100, scale_number = 1, batch_size = 256, use_paper_model = False):
         
-        
-        
-        USE_CUDA = True
         input_file_path = "sources/meshes"
         input_file = os.path.join(input_file_path, input_file_name + ".obj")
         if not os.path.exists(input_file):
@@ -70,10 +84,12 @@ class normal_Est:
         input_points[:,:3] = np.r_[input_mesh.vertices, input_mesh_points]
         input_points[:input_mesh.vertices.shape[0], 3:] = input_mesh_norm
         
+        # store as .xyz file
         K_number = "_K" + str(K)
         batch_size_number = "_bs" + str(batch_size)
-        # store as .xyz file
         xyz_file_path = "sources/xyzfiles"
+        if not os.path.exists(xyz_file_path):
+            os.makedirs(xyz_file_path)
         xyz_file_name = input_file_name + K_number + batch_size_number + ".xyz"
         xyz_file = os.path.join(xyz_file_path, xyz_file_name)
         np.savetxt(xyz_file, input_points, delimiter=' ', fmt='%f')
@@ -84,7 +100,7 @@ class normal_Est:
         # load the file
         estimator.loadXYZ(xyz_file)
 
-        Ks, model, mean = self.load_model(K,scale_number)
+        Ks, model, mean = self.load_model(K, scale_number, use_paper_model)
 
         # set the neighborhood size
         estimator.setKs(Ks)
@@ -115,21 +131,21 @@ class normal_Est:
                 estimator.setBatch(pt_id,bs,estimations.astype(float))
 
         # save the estimator
-        save_path = self.test_save_path(scale_number)
+        save_path = self.estimate_result_path(scale_number, use_paper_model)
         save_path = os.path.join(save_path,xyz_file_name)
         estimator.saveXYZ(save_path)
         
-    def evaluate(self, file_name, scale_number = 1, K = 256, batch_size = 256):
+    def evaluate(self, file_name, scale_number = 1, K = 100, batch_size = 256, use_paper_model = False):
         # the origin data path
+        K_number = "_K" + str(K)
+        batch_size_number = "_bs" + str(batch_size)
         origin_file_path = "sources/xyzfiles"
-        origin_file = os.path.join(origin_file_path, file_name + ".xyz")
+        origin_file = os.path.join(origin_file_path, file_name + K_number + batch_size_number + ".xyz")
         if not os.path.exists(origin_file):
             print("No file exists! Check the path!")
 
-        K_number = "_K" + str(K)
-        batch_size_number = "_bs" + str(batch_size)
         # the evaluate data path
-        eva_file_path = self.test_save_path(scale_number)
+        eva_file_path = self.estimate_result_path(scale_number,use_paper_model)
         eva_file = os.path.join(eva_file_path, file_name + K_number + batch_size_number + ".xyz")
         if not os.path.exists(eva_file):
             print("No file exists! Check the path!")
