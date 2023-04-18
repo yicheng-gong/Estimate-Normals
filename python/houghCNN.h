@@ -304,8 +304,32 @@ class NormEst{
 		std::vector<unsigned int> rand_ints;
 
 
-		int generate_training_accum_random_corner(int noise_val, int n_points, double* array, double* array_gt);
 };
+
+class EstimationTools{
+	/* ----- class member functions ----- */
+	public:
+		void fillAccum(HoughAccum& hd, std::vector<long int>& nbh, int nbh_size,
+					const NormEst* est, unsigned int& randPos,
+					const std::vector<float>& proba_vector,
+					bool use_aniso,
+					bool compute_P = true, Matrix3 P_ref=Matrix3());
+
+
+		double searchKNN(const kd_tree& tree, const Vector3& pt, int K, std::vector<long int>& indices, std::vector<double>& distances);
+
+		void sortIndicesByDistances(std::vector<long int>& indices, const std::vector<double>& distances);
+
+		void createAngle(Eigen::MatrixX3d& points, Eigen::MatrixX3d& normals, double angle, int nb_points);
+
+		void randomRotation(Eigen::MatrixX3d& pc, Eigen::MatrixX3d& normals);
+
+		void addGaussianNoise(Eigen::MatrixX3d& pc, double sigma);
+
+		void addGaussianNoisePercentage(Eigen::MatrixX3d& pc, int percentage);
+};
+
+
 
 
 #endif
