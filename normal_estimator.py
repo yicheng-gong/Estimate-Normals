@@ -50,19 +50,19 @@ class normal_Est:
     def estimate_result_path(self, scale_number, use_paper_model):
         if scale_number == 1:
             if use_paper_model:
-                est_result_path = "estimate_result/paper_model_1s"
+                est_result_path = "estimate_results/paper_model_1s"
             else:
-                est_result_path = "estimate_result/model_1s"
+                est_result_path = "estimate_results/model_1s"
         elif scale_number == 3:
             if use_paper_model:
-                est_result_path = "estimate_result/paper_model_3s"
+                est_result_path = "estimate_results/paper_model_3s"
             else:
-                est_result_path = "estimate_result/model_3s"
+                est_result_path = "estimate_results/model_3s"
         elif scale_number == 5:
             if use_paper_model:
-                est_result_path = "estimate_result/paper_model_5s"
+                est_result_path = "estimate_results/paper_model_5s"
             else:
-                est_result_path = "estimate_result/model_5s"
+                est_result_path = "estimate_results/model_5s"
         if not os.path.exists(est_result_path):
             os.makedirs(est_result_path)
         

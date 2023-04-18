@@ -2,6 +2,7 @@
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+import os
 
 from normal_estimator import normal_Est
 
@@ -26,6 +27,9 @@ if __name__ == "__main__":
     angle_s5, prob_s5 = nest.evaluate(input_file_name, scale_number = 5)
     
     #plot the figure
+    figure_path = "evaluate_figures_plot"
+    if not os.path.exists(figure_path):
+        os.makedirs(figure_path)
     plt.plot(angle_s1, prob_s1, label = "scale_number = 1")
     plt.plot(angle_s3, prob_s3, label = "scale_number = 3")
     plt.plot(angle_s5, prob_s5, label = "scale_number = 5")
@@ -33,6 +37,6 @@ if __name__ == "__main__":
     plt.xlabel('angle')
     plt.ylabel('prob')
     plt.title('Scale Number')
-    # plt.savefig('Q7_Results/fitness_score.pdf')
+    plt.savefig(os.path.join(figure_path, 'scale_number.pdf'))
     plt.show()
         
