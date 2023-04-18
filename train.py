@@ -41,8 +41,8 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     # training model parameter
-    K = 256
-    scale_number = 1
+    K = 100
+    scale_number = 3
     batch_size = 256
 
     # choose device
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     # configure dataset
     dataset_size = 100000
     dataset_path = "dataset"
-    dataset_name = "dataset.p"
+    dataset_name = "dataset_" + str(scale_number) + ".p"
     if not os.path.exists(dataset_path):
         os.makedirs(dataset_path)
     dataset_path = os.path.join(dataset_path, dataset_name)
