@@ -41,7 +41,7 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     # training model parameter
-    K = 100
+    K = 256
     scale_number = 1
     batch_size = 256
 

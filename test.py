@@ -49,12 +49,12 @@ def save_test_result(scale_number,output_filename):
     
 if __name__ == "__main__":
     
-    K = 100
+    K = 16
     scale_number = 1
-    batch_size = 512
+    batch_size = 256
     USE_CUDA = True
     input_file_path = "sources/meshes"
-    input_file_name = "bunny"
+    input_file_name = "dragon"
     input_file = os.path.join(input_file_path, input_file_name + ".obj")
     if not os.path.exists(input_file):
         print("no file exists! Check the path!")
@@ -62,12 +62,16 @@ if __name__ == "__main__":
     # mesh load
     input_mesh = trimesh.load(input_file)
     input_mesh_norm = input_mesh.vertex_normals
+    input_mesh_points = input_mesh.sample(0)
+    input_points = np.zeros([input_mesh.vertices.shape[0] + input_mesh_points.shape[0], 6])
+    input_points[:,:3] = np.r_[input_mesh.vertices, input_mesh_points]
+    input_points[:input_mesh.vertices.shape[0], 3:] = input_mesh_norm
     
     # store as .xyz file
     xyz_file_path = "sources/xyzfiles"
     xyz_file_name = input_file_name + ".xyz"
     xyz_file = os.path.join(xyz_file_path, xyz_file_name)
-    np.savetxt(xyz_file, input_mesh.vertices, delimiter=' ', fmt='%f')
+    np.savetxt(xyz_file, input_points, delimiter=' ', fmt='%f')
 
     # create the estimator
     estimator = Estimator.NormalEstimatorHoughCNN()
@@ -109,7 +113,4 @@ if __name__ == "__main__":
     # save the estimator
     save_path = save_test_result(scale_number, xyz_file_name)
     estimator.saveXYZ(save_path)
-    est_normals = estimator.getNormals()
-    
-    MSE = np.linalg.norm((input_mesh_norm - est_normals))
-    print(MSE)
+
