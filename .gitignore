@@ -1,9 +1,8 @@
 .vscode/
 dataset/
-training_result/
-python/build/
-python/NormalEstimatorHoughCNN.cpp
-python/NormalEstimatorHoughCNN.cpython-310-x86_64-linux-gnu.so
-test_result/
+normal_estimator_cpp/build/
+normal_estimator_cpp/NormalEstimatorHoughCNN.cpp
+normal_estimator_cpp/NormalEstimatorHoughCNN.cpython-310-x86_64-linux-gnu.so
+estimate_results/
 __pycache__/
 models/__pycache__/
