@@ -6,3 +6,4 @@ normal_estimator_cpp/NormalEstimatorHoughCNN.cpython-310-x86_64-linux-gnu.so
 estimate_results/
 __pycache__/
 models/__pycache__/
+source/xyzfiles/
