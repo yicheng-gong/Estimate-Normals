@@ -327,6 +327,8 @@ class EstimationTools{
 		void addGaussianNoise(Eigen::MatrixX3d& pc, double sigma);
 
 		void addGaussianNoisePercentage(Eigen::MatrixX3d& pc, int percentage);
+
+		VectorX gaussianBlur(VectorX& accum, int kernelSize, float sigma, int A = 33);
 };
 
 
