@@ -561,7 +561,7 @@ EstimationTools::fillAccum(HoughAccum& hd, std::vector<long int>& nbh, int nbh_s
 		accum_vec.row(pos) += nl;
 	}
 
-	accum = gaussianBlur(accum,5,1);
+	//accum = gaussianBlur(accum,5,1);
 	//renorm patch
 	accum /= accum.maxCoeff();
 

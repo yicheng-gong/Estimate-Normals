@@ -67,9 +67,14 @@ class normal_Est:
             os.makedirs(est_result_path)
         
         return est_result_path
+    
+    def add_noise(self, input_mesh_points,noise_scale):
+        m,n = input_mesh_points.shape
+        mean_point = np.mean(input_mesh_points,axis=0)
+        input_mesh_points = input_mesh_points + noise_scale*mean_point*np.random.randn(m,n)
             
         
-    def est_normal(self, input_file_name, sample_num = 0, K = 100, scale_number = 1, batch_size = 256, use_paper_model = False):
+    def est_normal(self, input_file_name, noise_scale = 0, sample_num = 0, K = 100, scale_number = 1, batch_size = 256, use_paper_model = False):
         
         input_file_path = "sources/meshes"
         input_file = os.path.join(input_file_path, input_file_name + ".obj")
@@ -80,6 +85,7 @@ class normal_Est:
         input_mesh = trimesh.load(input_file)
         input_mesh_norm = input_mesh.vertex_normals
         input_mesh_points = input_mesh.sample(sample_num)
+        self.add_noise(input_mesh_points,noise_scale)
         input_points = np.zeros([input_mesh.vertices.shape[0] + input_mesh_points.shape[0], 6])
         input_points[:,:3] = np.r_[input_mesh.vertices, input_mesh_points]
         input_points[:input_mesh.vertices.shape[0], 3:] = input_mesh_norm
@@ -87,10 +93,11 @@ class normal_Est:
         # store as .xyz file
         K_number = "_K" + str(K)
         batch_size_number = "_bs" + str(batch_size)
+        noise_scale_number = "_ns" + str(noise_scale)
         xyz_file_path = "sources/xyzfiles"
         if not os.path.exists(xyz_file_path):
             os.makedirs(xyz_file_path)
-        xyz_file_name = input_file_name + K_number + batch_size_number + ".xyz"
+        xyz_file_name = input_file_name + K_number + batch_size_number + noise_scale_number +".xyz"
         xyz_file = os.path.join(xyz_file_path, xyz_file_name)
         np.savetxt(xyz_file, input_points, delimiter=' ', fmt='%f')
 
@@ -135,18 +142,19 @@ class normal_Est:
         save_path = os.path.join(save_path,xyz_file_name)
         estimator.saveXYZ(save_path)
         
-    def evaluate(self, file_name, scale_number = 1, K = 100, batch_size = 256, use_paper_model = False):
+    def evaluate(self, file_name, noise_scale = 0, scale_number = 1, K = 100, batch_size = 256, use_paper_model = False):
         # the origin data path
         K_number = "_K" + str(K)
         batch_size_number = "_bs" + str(batch_size)
+        noise_scale_number = "_ns" + str(noise_scale)
         origin_file_path = "sources/xyzfiles"
-        origin_file = os.path.join(origin_file_path, file_name + K_number + batch_size_number + ".xyz")
+        origin_file = os.path.join(origin_file_path, file_name + K_number + batch_size_number + noise_scale_number + ".xyz")
         if not os.path.exists(origin_file):
             print("No file exists! Check the path!")
 
         # the evaluate data path
         eva_file_path = self.estimate_result_path(scale_number,use_paper_model)
-        eva_file = os.path.join(eva_file_path, file_name + K_number + batch_size_number + ".xyz")
+        eva_file = os.path.join(eva_file_path, file_name + K_number + batch_size_number + noise_scale_number + ".xyz")
         if not os.path.exists(eva_file):
             print("No file exists! Check the path!")
             
@@ -160,19 +168,27 @@ class normal_Est:
         origin_norm = origin_points[:, 3:]
         eva_norm = eva_points[:, 3:]
 
+        
+        
         # compute angle
         cos_theta = np.sum(origin_norm * eva_norm, axis=1) / (np.linalg.norm(origin_norm, axis=1) * np.linalg.norm(eva_norm, axis=1))
         theta = np.arccos(cos_theta)
         theta[theta>np.pi/2] = np.pi - theta[theta>np.pi/2]
 
+        # compute RMS
+        RMS = np.linalg.norm(np.rad2deg(theta))/theta.shape[0]
+        
         # compute prob
         angle = []
         prob = []
-        for i in range(90):
+        for i in range(91):
             less_count = theta[theta < np.deg2rad(i)].shape[0]
             angle.append(i)
             prob.append(less_count/theta.shape[0])
         
-        return angle, prob
+        # compute prob of angle devation less than 5 and 10 degree
+        
+        
+        return RMS, angle, prob
 
 
