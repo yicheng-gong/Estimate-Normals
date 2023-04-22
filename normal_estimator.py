@@ -68,10 +68,31 @@ class normal_Est:
         
         return est_result_path
     
-    def add_noise(self, input_mesh_points,noise_scale):
-        m,n = input_mesh_points.shape
-        mean_point = np.mean(input_mesh_points,axis=0)
-        input_mesh_points = input_mesh_points + noise_scale*mean_point*np.random.randn(m,n)
+    def add_gaussian_noise(self,points,noise_scale):
+        # points: numpy array with shape (N, 3), representing a point cloud
+
+        # calculate the mean of each coordinate
+        mean_x = np.mean(points[:,0])
+        mean_y = np.mean(points[:,1])
+        mean_z = np.mean(points[:,2])
+
+        # calculate the standard deviation of the Gaussian noise for each coordinate
+        std_x = np.abs(mean_x) * noise_scale
+        std_y = np.abs(mean_y) * noise_scale
+        std_z = np.abs(mean_z) * noise_scale
+
+        # generate Gaussian noise for each coordinate
+        noise_x = np.random.normal(0, std_x, size=points.shape[0])
+        noise_y = np.random.normal(0, std_y, size=points.shape[0])
+        noise_z = np.random.normal(0, std_z, size=points.shape[0])
+
+        # add noise to each coordinate
+        noisy_points = points.copy()
+        noisy_points[:,0] += noise_x
+        noisy_points[:,1] += noise_y
+        noisy_points[:,2] += noise_z
+
+        return noisy_points
             
         
     def est_normal(self, input_file_name, noise_scale = 0, sample_num = 0, K = 100, scale_number = 1, batch_size = 256, use_paper_model = False):
@@ -85,10 +106,10 @@ class normal_Est:
         input_mesh = trimesh.load(input_file)
         input_mesh_norm = input_mesh.vertex_normals
         input_mesh_points = input_mesh.sample(sample_num)
-        self.add_noise(input_mesh_points,noise_scale)
+        noisy_vertices = self.add_gaussian_noise(input_mesh.vertices,noise_scale)
         input_points = np.zeros([input_mesh.vertices.shape[0] + input_mesh_points.shape[0], 6])
-        input_points[:,:3] = np.r_[input_mesh.vertices, input_mesh_points]
-        input_points[:input_mesh.vertices.shape[0], 3:] = input_mesh_norm
+        input_points[:,:3] = np.r_[noisy_vertices, input_mesh_points]
+        input_points[:noisy_vertices.shape[0], 3:] = input_mesh_norm
         
         # store as .xyz file
         K_number = "_K" + str(K)
