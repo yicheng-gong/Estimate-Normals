@@ -71,27 +71,10 @@ class normal_Est:
     def add_gaussian_noise(self,points,noise_scale):
         # points: numpy array with shape (N, 3), representing a point cloud
 
-        # calculate the mean of each coordinate
-        mean_x = np.mean(points[:,0])
-        mean_y = np.mean(points[:,1])
-        mean_z = np.mean(points[:,2])
-
-        # calculate the standard deviation of the Gaussian noise for each coordinate
-        std_x = np.abs(mean_x) * noise_scale
-        std_y = np.abs(mean_y) * noise_scale
-        std_z = np.abs(mean_z) * noise_scale
-
-        # generate Gaussian noise for each coordinate
-        noise_x = np.random.normal(0, std_x, size=points.shape[0])
-        noise_y = np.random.normal(0, std_y, size=points.shape[0])
-        noise_z = np.random.normal(0, std_z, size=points.shape[0])
-
-        # add noise to each coordinate
-        noisy_points = points.copy()
-        noisy_points[:,0] += noise_x
-        noisy_points[:,1] += noise_y
-        noisy_points[:,2] += noise_z
-
+        mean_distance = np.linalg.norm(np.mean(points,axis = 0))
+        std = noise_scale * mean_distance
+        noise = np.random.normal(0,std,points.shape)
+        noisy_points = points + noise
         return noisy_points
             
         
@@ -197,7 +180,10 @@ class normal_Est:
         theta[theta>np.pi/2] = np.pi - theta[theta>np.pi/2]
 
         # compute RMS
-        RMS = np.linalg.norm(np.rad2deg(theta))/theta.shape[0]
+        RMS = 0
+        for i in range(len(theta)):
+            RMS += np.rad2deg(theta[i])**2
+        RMS = np.sqrt(RMS/len(theta))
         
         # compute prob
         angle = []
