@@ -86,7 +86,7 @@ cdef class NormalEstimatorHoughCNN:
 
     cpdef get_K_density(self):
         return self.thisptr.getKaniso()
-    cpdef set_K_density(self, K_d):
+    cpdef set_K_density(self, K_d): a
         self.thisptr.setKaniso(K_d)
 
     def getKs(self):
