@@ -89,10 +89,11 @@ class normal_Est:
         input_mesh = trimesh.load(input_file)
         input_mesh_norm = input_mesh.vertex_normals
         input_mesh_points = input_mesh.sample(sample_num)
-        noisy_vertices = self.add_gaussian_noise(input_mesh.vertices,noise_scale)
         input_points = np.zeros([input_mesh.vertices.shape[0] + input_mesh_points.shape[0], 6])
-        input_points[:,:3] = np.r_[noisy_vertices, input_mesh_points]
-        input_points[:noisy_vertices.shape[0], 3:] = input_mesh_norm
+        input_points[:,:3] = np.r_[input_mesh.vertices, input_mesh_points]
+        noisy_points = self.add_gaussian_noise(input_points[:,:3],noise_scale)
+        input_points[:,:3] = noisy_points
+        input_points[:input_mesh_norm.shape[0], 3:] = input_mesh_norm
         
         # store as .xyz file
         K_number = "_K" + str(K)
@@ -180,10 +181,7 @@ class normal_Est:
         theta[theta>np.pi/2] = np.pi - theta[theta>np.pi/2]
 
         # compute RMS
-        RMS = 0
-        for i in range(len(theta)):
-            RMS += np.rad2deg(theta[i])**2
-        RMS = np.sqrt(RMS/len(theta))
+        RMS = np.linalg.norm(np.rad2deg(theta))/np.sqrt(theta.shape[0])
         
         # compute prob
         angle = []

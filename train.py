@@ -40,8 +40,8 @@ if __name__ == "__main__":
     torch.backends.cudnn.benchmark = True
 
     # training model parameter
-    K = 100
-    scale_number = 3
+    K = 128
+    scale_number = 5
     batch_size = 256
 
     # choose device
