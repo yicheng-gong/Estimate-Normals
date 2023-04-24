@@ -234,8 +234,8 @@ NormEst::generateTrainAccRandomCorner(int noise_val, int n_points, double* array
 	is_tree_initialized = false;
 
 	int N = 5000; // size of the point cloud to be generated
-    double angle_max = 1.; // max angle of the angle
-    double angle_min = 0.2; // min angle of the points cloud
+    double angle_max = 160 * DEG2RAD; // max angle of the angle
+    double angle_min = 80 * DEG2RAD; // min angle of the points cloud
 	double max_square_dist = 0.02; // maximal square dist to accept point (be sure it include a corner or an edge)
 
 	EstimationTools et;

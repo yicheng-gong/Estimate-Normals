@@ -4,62 +4,117 @@ import numpy as np
 from tqdm import *
 import torch
 from torch.autograd import Variable
+import torch.nn as nn
+import torch.optim as optim
+import torch.utils.data
 import os
 import trimesh
 import scipy
 import matplotlib.pyplot as plt
+import pickle
 
 class normal_Est:
     
+    # init parameter
+    set_scale_number = 1
+    set_batch_size = 256
+    set_K = 100
+    set_noise_scale = 0
+    use_paper_model = False
+    density_sensitive = False
+    set_dataset_size = 100000
+    
+    # choose device
+    if torch.cuda.is_available():
+        USE_CUDA = True
+    else:
+        USE_CUDA = False
+    
     def __init__(self):
         pass
-
-    def load_model(self, K, scale_number, use_paper_model):
-        model_file_name = "model.pth"
-        mean_file_name = "mean.npz"
-        if scale_number == 1:
-            Ks=np.array([K], dtype=int)
-            import cnn_models.model_1s as model_1s
-            if use_paper_model:
+    
+    def parameter_init(self):
+        self.set_scale_number = 1
+        self.set_batch_size = 256
+        self.set_K = 100
+        self.set_noise_scale = 0
+        self.use_paper_model = False
+        self.density_sensitive = False
+        self.set_dataset_size = 100000
+        
+    def dataset_create(self, dataset_path, estimator):
+        print("creating dataset")
+        count = 0
+        dataset = np.zeros((self.set_dataset_size, self.set_scale_number, 33,33))
+        targets = np.zeros((self.set_dataset_size, 2))
+        for i in tqdm(range(0, self.set_dataset_size, self.set_batch_size), ncols=80):
+            nbr, batch, batch_targets = estimator.generateTrainAccRandomCorner(self.set_batch_size)
+            if count+nbr > self.set_dataset_size:
+                nbr = self.set_dataset_size - count
+            dataset[count:count+nbr] = batch[0:nbr]
+            targets[count:count+nbr] = batch_targets[0:nbr]
+            count += nbr
+            if(count >= self.set_dataset_size):
+                break
+            
+        mean = dataset.mean(axis=0)
+        print(mean.shape)
+        dataset = {"input":dataset, "targets":targets, "mean":mean}
+        print("  saving")
+        pickle.dump(dataset, open(dataset_path, "wb" ))
+        print("-->done")
+    
+    def generate_file_name(self):
+        K_name = "_K" + str(self.set_K)
+        scale_number_name = "_sn" + str(self.set_scale_number)
+        batch_size_name = "_bs" + str(self.set_batch_size)
+        if self.density_sensitive:
+            density_sensitve_name = "_ds1"
+        else:
+            density_sensitve_name = "_ds0"
+            
+        fn_ = K_name + scale_number_name + batch_size_name + density_sensitve_name
+        
+        return fn_
+    
+    def model_init(self):
+        if self.set_scale_number == 1:
+            Ks=np.array([self.set_K], dtype=int)
+            import cnn_models.model_1s as modelCNN
+            if self.use_paper_model:
                 model_path = "models_in_paper/model_1s_boulch_SGP2016"
             else:
                 model_path = "models_reproduced/model_1s"
-            model = model_1s.load_model(os.path.join(model_path, model_file_name))
-            mean = np.load(os.path.join(model_path, mean_file_name))["arr_0"]
-        elif scale_number == 3:
-            Ks=np.array([K,K/2,K*2], dtype=int)
-            import cnn_models.model_3s as model_3s
-            if use_paper_model:
+        elif self.set_scale_number == 3:
+            Ks=np.array([self.set_K, self.set_K/2, self.set_K*2], dtype=int)
+            import cnn_models.model_3s as modelCNN
+            if self.use_paper_model:
                 model_path = "models_in_paper/model_3s_boulch_SGP2016"
             else:
                 model_path = "models_reproduced/model_3s"
-            model = model_3s.load_model(os.path.join(model_path, model_file_name))
-            mean = np.load(os.path.join(model_path, mean_file_name))["arr_0"]
-        elif scale_number == 5:
-            Ks=np.array([K,K/4,K/2,K*2,K*4], dtype=int)
-            import cnn_models.model_5s as model_5s
-            if use_paper_model:
+        elif self.set_scale_number == 5:
+            Ks=np.array([self.set_K, self.set_K/4, self.set_K/2, self.set_K*2, self.set_K*4], dtype=int)
+            import cnn_models.model_5s as modelCNN
+            if self.use_paper_model:
                 model_path = "models_in_paper/model_5s_boulch_SGP2016"
             else:
                 model_path = "models_reproduced/model_5s"
-            model = model_5s.load_model(os.path.join(model_path, model_file_name))
-            mean = np.load(os.path.join(model_path, mean_file_name))["arr_0"]
-            
-        return Ks, model, mean
+        
+        return Ks, model_path, modelCNN
 
-    def estimate_result_path(self, scale_number, use_paper_model):
-        if scale_number == 1:
-            if use_paper_model:
+    def estimate_result_path(self):
+        if self.set_scale_number == 1:
+            if self.use_paper_model:
                 est_result_path = "estimate_results/paper_model_1s"
             else:
                 est_result_path = "estimate_results/model_1s"
-        elif scale_number == 3:
-            if use_paper_model:
+        elif self.set_scale_number == 3:
+            if self.use_paper_model:
                 est_result_path = "estimate_results/paper_model_3s"
             else:
                 est_result_path = "estimate_results/model_3s"
-        elif scale_number == 5:
-            if use_paper_model:
+        elif self.set_scale_number == 5:
+            if self.use_paper_model:
                 est_result_path = "estimate_results/paper_model_5s"
             else:
                 est_result_path = "estimate_results/model_5s"
@@ -68,17 +123,113 @@ class normal_Est:
         
         return est_result_path
     
-    def add_gaussian_noise(self,points,noise_scale):
+    def add_gaussian_noise(self, points):
         # points: numpy array with shape (N, 3), representing a point cloud
 
         mean_distance = np.linalg.norm(np.mean(points,axis = 0))
-        std = noise_scale * mean_distance
+        std = self.set_noise_scale * mean_distance
         noise = np.random.normal(0,std,points.shape)
         noisy_points = points + noise
         return noisy_points
             
+    def model_training(self): 
+        # training parameter
+        drop_learning_rate = 0.5
+        learning_rate = 0.1
+        epoch_max = 40
+        decrease_step = 4
         
-    def est_normal(self, input_file_name, noise_scale = 0, sample_num = 0, K = 100, scale_number = 1, batch_size = 256, use_paper_model = False):
+        # faster computation times
+        torch.backends.cudnn.benchmark = True
+        
+        # create the estimator
+        estimator = Estimator.NormalEstimatorHoughCNN()
+        
+        # Ks computing and model selecting    
+        Ks, model_path, modelCNN = self.model_init()
+        estimator.setKs(Ks)
+        estimator.setDensitySensitive(self.density_sensitive)
+        net = modelCNN.create_model()
+        
+        # training result store
+        if not os.path.exists(model_path):
+            os.makedirs(model_path)
+        model_result_name = "model" + self.generate_file_name() + ".pth"
+        model_result_path = os.path.join(model_path, model_result_name)
+        
+        
+        if not os.path.exists(model_result_path):
+            
+            # configure dataset
+            dataset_path = "dataset"
+            dataset_name = "dataset.p"
+            if not os.path.exists(dataset_path):
+                os.makedirs(dataset_path)
+            dataset_path = os.path.join(dataset_path, dataset_name)
+            self.dataset_create(dataset_path, estimator)
+                
+            # dataset loading
+            print("loading the model")
+            dataset = pickle.load(open(dataset_path, "rb" ))
+            dataset["input"] -= dataset["mean"][None,:,:,:]
+            input_data = torch.from_numpy(dataset["input"]).float()
+            target_data = torch.from_numpy(dataset["targets"]).float()
+            ds = torch.utils.data.TensorDataset(input_data, target_data)
+            ds_loader = torch.utils.data.DataLoader(ds, self.set_batch_size, shuffle=True)
+            
+            np.savez(os.path.join(model_path, "mean" + self.generate_file_name() +".npz"), dataset["mean"])
+            
+            # create optimizer
+            print("Creating optimizer")
+            criterion = nn.MSELoss()
+            optimizer = optim.SGD(net.parameters(), lr=learning_rate, weight_decay=5e-4, momentum=0.9)
+            
+            # apply in gpu
+            if self.USE_CUDA:
+                net.cuda()
+                criterion.cuda()
+            
+            # start train
+            print("Training")
+            for epoch in range(epoch_max):
+
+                if(epoch%decrease_step==0 and epoch>0):
+                    learning_rate *= drop_learning_rate
+                    for param_group in optimizer.param_groups:
+                        param_group['lr'] = learning_rate
+
+                total_loss = 0
+                count = 0
+
+                t = tqdm(ds_loader, ncols=80)
+                for data in t:
+
+                    # set optimizer gradients to zero
+                    optimizer.zero_grad()
+
+                    # create variables
+                    batch = Variable(data[0])
+                    batch_target = Variable(data[1])
+                    if(self.USE_CUDA):
+                        batch = batch.cuda()
+                        batch_target = batch_target.cuda()
+
+                    # forward backward
+                    output = net.forward(batch)
+                    error = criterion(output, batch_target)
+                    error.backward()
+                    optimizer.step()
+
+                    count += batch.size(0)
+                    total_loss += error.item()
+
+                    t.set_postfix(Bloss= error.item()/batch.size(0), loss= total_loss/count)
+
+                # save the model
+                torch.save(net.state_dict(), model_result_path)
+            print("training finished")
+    
+    def est_normal(self, input_file_name, sample_num = 0):
         
         input_file_path = "sources/meshes"
         input_file = os.path.join(input_file_path, input_file_name + ".obj")
@@ -91,28 +242,37 @@ class normal_Est:
         input_mesh_points = input_mesh.sample(sample_num)
         input_points = np.zeros([input_mesh.vertices.shape[0] + input_mesh_points.shape[0], 6])
         input_points[:,:3] = np.r_[input_mesh.vertices, input_mesh_points]
-        noisy_points = self.add_gaussian_noise(input_points[:,:3],noise_scale)
-        input_points[:,:3] = noisy_points
+        input_points[:,:3] = self.add_gaussian_noise(input_points[:,:3])
         input_points[:input_mesh_norm.shape[0], 3:] = input_mesh_norm
+        input_points[input_mesh_norm.shape[0]:, 3] = 100 
         
         # store as .xyz file
-        K_number = "_K" + str(K)
-        batch_size_number = "_bs" + str(batch_size)
-        noise_scale_number = "_ns" + str(noise_scale)
         xyz_file_path = "sources/xyzfiles"
         if not os.path.exists(xyz_file_path):
             os.makedirs(xyz_file_path)
-        xyz_file_name = input_file_name + K_number + batch_size_number + noise_scale_number +".xyz"
+        xyz_file_name = input_file_name +".xyz"
         xyz_file = os.path.join(xyz_file_path, xyz_file_name)
         np.savetxt(xyz_file, input_points, delimiter=' ', fmt='%f')
 
         # create the estimator
         estimator = Estimator.NormalEstimatorHoughCNN()
+        estimator.setDensitySensitive(self.density_sensitive)
 
         # load the file
         estimator.loadXYZ(xyz_file)
 
-        Ks, model, mean = self.load_model(K, scale_number, use_paper_model)
+        # Ks, model, mean = self.load_model()
+        Ks, model_path, modelCNN = self.model_init()
+        if self.use_paper_model:
+            model_result_name = "model.pth"
+            model_result_path = os.path.join(model_path, model_result_name)
+            model = modelCNN.load_model(model_result_path)
+            mean = np.load(os.path.join(model_path, "mean.npz"))["arr_0"]
+        else:
+            model_result_name = "model" + self.generate_file_name() + ".pth"
+            model_result_path = os.path.join(model_path, model_result_name)
+            model = modelCNN.load_model(model_result_path)
+            mean = np.load(os.path.join(model_path, "mean" + self.generate_file_name() +".npz"))["arr_0"]
 
         # set the neighborhood size
         estimator.setKs(Ks)
@@ -120,60 +280,49 @@ class normal_Est:
         # initialize
         estimator.initialize()
 
-        # choose device
-        if torch.cuda.is_available():
-            USE_CUDA = True
-        else:
-            USE_CUDA = False
-
         # convert model to cuda if needed
-        if USE_CUDA:
+        if self.USE_CUDA:
             model.cuda()
         model.eval()
         # iterate over the batches
         with torch.no_grad():
-            for pt_id in tqdm(range(0,estimator.getPCSize(), batch_size)):
-                bs = batch_size
+            for pt_id in tqdm(range(0,estimator.getPCSize(), self.set_batch_size)):
+                bs = self.set_batch_size
                 batch = estimator.getBatch(pt_id, bs) - mean[None,:,:,:]
                 batch_th = torch.Tensor(batch)
-                if USE_CUDA:
+                if self.USE_CUDA:
                     batch_th = batch_th.cuda()
                 estimations = model.forward(batch_th)
                 estimations = estimations.cpu().data.numpy()
                 estimator.setBatch(pt_id,bs,estimations.astype(float))
 
         # save the estimator
-        save_path = self.estimate_result_path(scale_number, use_paper_model)
+        save_path = self.estimate_result_path()
         save_path = os.path.join(save_path,xyz_file_name)
         estimator.saveXYZ(save_path)
         
-    def evaluate(self, file_name, noise_scale = 0, scale_number = 1, K = 100, batch_size = 256, use_paper_model = False):
+    def evaluate(self, file_name):
         # the origin data path
-        K_number = "_K" + str(K)
-        batch_size_number = "_bs" + str(batch_size)
-        noise_scale_number = "_ns" + str(noise_scale)
         origin_file_path = "sources/xyzfiles"
-        origin_file = os.path.join(origin_file_path, file_name + K_number + batch_size_number + noise_scale_number + ".xyz")
+        origin_file = os.path.join(origin_file_path, file_name + ".xyz")
         if not os.path.exists(origin_file):
             print("No file exists! Check the path!")
 
         # the evaluate data path
-        eva_file_path = self.estimate_result_path(scale_number,use_paper_model)
-        eva_file = os.path.join(eva_file_path, file_name + K_number + batch_size_number + noise_scale_number + ".xyz")
+        eva_file_path = self.estimate_result_path()
+        eva_file = os.path.join(eva_file_path, file_name + ".xyz")
         if not os.path.exists(eva_file):
             print("No file exists! Check the path!")
             
         # load data
         origin_points = np.loadtxt(origin_file)
         eva_points = np.loadtxt(eva_file)
-        origin_points = origin_points[origin_points[:,3] != 0]
+        origin_points = origin_points[origin_points[:, 3] != 100]
         eva_points = eva_points[:origin_points.shape[0],:]
 
         # split norm point
         origin_norm = origin_points[:, 3:]
         eva_norm = eva_points[:, 3:]
-
-        
         
         # compute angle
         cos_theta = np.sum(origin_norm * eva_norm, axis=1) / (np.linalg.norm(origin_norm, axis=1) * np.linalg.norm(eva_norm, axis=1))
@@ -190,9 +339,6 @@ class normal_Est:
             less_count = theta[theta < np.deg2rad(i)].shape[0]
             angle.append(i)
             prob.append(less_count/theta.shape[0])
-        
-        # compute prob of angle devation less than 5 and 10 degree
-        
         
         return RMS, angle, prob
 

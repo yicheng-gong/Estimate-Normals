@@ -1,21 +1,3 @@
-// Deep Learning for Robust Normal Estimation in Unstructured Point Clouds
-// Copyright (c) 2016 Alexande Boulch and Renaud Marlet
-//
-// This program is free software; you can redistribute it and/or modify it under the
-// terms of the GNU General Public License as published by the Free Software
-// Foundation; either version 3 of the License, or any later version.
-// This program is distributed in the hope that it will be useful, but WITHOUT
-// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-// FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
-// You should have received a copy of the GNU General Public License along with this
-// program; if not, write to the Free Software Foundation, Inc., 51 Franklin Street,
-// Fifth Floor, Boston, MA 02110-1301  USA
-//
-// PLEASE ACKNOWLEDGE THE ORIGINAL AUTHORS AND PUBLICATION:
-// "Deep Learning for Robust Normal Estimation in Unstructured Point Clouds "
-// by Alexandre Boulch and Renaud Marlet, Symposium of Geometry Processing 2016,
-// Computer Graphics Forum
-
 #ifndef NORMALS_EST_HEADER
 #define NORMALS_EST_HEADER
 
@@ -31,7 +13,6 @@
 #include <string>
 #include <unistd.h>
 
-
 typedef Eigen::Vector3d Vector3;
 typedef Eigen::Vector2d Vector2;
 typedef Eigen::Matrix3d Matrix3;
@@ -42,6 +23,9 @@ typedef Eigen::VectorXd VectorX;
 typedef Eigen::MatrixXd MatrixX;
 typedef Eigen::Vector3i Vector3i;
 typedef typename nanoflann::KDTreeEigenMatrixAdaptor< MatrixX3 > kd_tree;
+
+#define DEG2RAD M_PI/180
+#define RAD2DEG 180/M_PI
 
 class HoughAccum{
 	public:
