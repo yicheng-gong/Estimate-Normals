@@ -343,7 +343,7 @@ class normal_Est:
         # compute angle
         cos_theta = np.sum(origin_norm * eva_norm, axis=1) / (np.linalg.norm(origin_norm, axis=1) * np.linalg.norm(eva_norm, axis=1))
         theta = np.arccos(cos_theta)
-        # theta[theta>np.pi/2] = np.pi - theta[theta>np.pi/2]
+        theta[theta>np.pi/2] = np.pi - theta[theta>np.pi/2]
 
         # compute RMS
         RMS = np.linalg.norm(np.rad2deg(theta))/np.sqrt(theta.shape[0])
