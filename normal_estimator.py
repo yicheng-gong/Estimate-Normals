@@ -22,13 +22,16 @@ class normal_Est:
     set_noise_scale = 0
     use_paper_model = False
     density_sensitive = False
+    use_ResNet = False
     set_dataset_size = 100000
     
     # choose device
     if torch.cuda.is_available():
         USE_CUDA = True
+        print("using device: CUDA")
     else:
         USE_CUDA = False
+        print("using device: CPU")
     
     def __init__(self):
         pass
@@ -40,6 +43,7 @@ class normal_Est:
         self.set_noise_scale = 0
         self.use_paper_model = False
         self.density_sensitive = False
+        self.use_ResNet = False
         self.set_dataset_size = 100000
         
     def dataset_create(self, dataset_path, estimator):
@@ -80,25 +84,40 @@ class normal_Est:
     def model_init(self):
         if self.set_scale_number == 1:
             Ks=np.array([self.set_K], dtype=int)
-            import cnn_models.model_1s as modelCNN
+            if self.use_ResNet:
+                import cnn_models.ResNet.model_1s as modelCNN
+                ResNet_name = "_ResNet"
+            else:
+                import cnn_models.LeNet.model_1s as modelCNN
+                ResNet_name = "_LeNet"
             if self.use_paper_model:
                 model_path = "models_in_paper/model_1s_boulch_SGP2016"
             else:
-                model_path = "models_reproduced/model_1s"
+                model_path = "models_reproduced/model_1s" + ResNet_name
         elif self.set_scale_number == 3:
             Ks=np.array([self.set_K, self.set_K/2, self.set_K*2], dtype=int)
-            import cnn_models.model_3s as modelCNN
+            if self.use_ResNet:
+                import cnn_models.ResNet.model_3s as modelCNN
+                ResNet_name = "_ResNet"
+            else:
+                import cnn_models.LeNet.model_3s as modelCNN
+                ResNet_name = "_LeNet"
             if self.use_paper_model:
                 model_path = "models_in_paper/model_3s_boulch_SGP2016"
             else:
-                model_path = "models_reproduced/model_3s"
+                model_path = "models_reproduced/model_3s"+ ResNet_name
         elif self.set_scale_number == 5:
             Ks=np.array([self.set_K, self.set_K/4, self.set_K/2, self.set_K*2, self.set_K*4], dtype=int)
-            import cnn_models.model_5s as modelCNN
+            if self.use_ResNet:
+                import cnn_models.ResNet.model_5s as modelCNN
+                ResNet_name = "_ResNet"
+            else:
+                import cnn_models.LeNet.model_5s as modelCNN
+                ResNet_name = "_LeNet"
             if self.use_paper_model:
                 model_path = "models_in_paper/model_5s_boulch_SGP2016"
             else:
-                model_path = "models_reproduced/model_5s"
+                model_path = "models_reproduced/model_5s" + ResNet_name
         
         return Ks, model_path, modelCNN
 
@@ -136,7 +155,7 @@ class normal_Est:
         # training parameter
         drop_learning_rate = 0.5
         learning_rate = 0.1
-        epoch_max = 40
+        epoch_max = 10
         decrease_step = 4
         
         # faster computation times

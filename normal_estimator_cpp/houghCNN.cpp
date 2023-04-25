@@ -375,7 +375,6 @@ EstimationTools::fillAccum(HoughAccum& hd, std::vector<long int>& nbh, int nbh_s
 				bool use_aniso,
 				bool compute_P, Matrix3 P_ref)
 {
-
 	//references
 	VectorX& accum = hd.accum;
 	Matrix3& P = hd.P;
@@ -394,44 +393,51 @@ EstimationTools::fillAccum(HoughAccum& hd, std::vector<long int>& nbh, int nbh_s
 	const int T = est->getT();
 	const std::vector<unsigned int>& rand_ints = est->rand_ints;
 
-
-
-
 	//regression
-	if (use_aniso){
+	if (use_aniso)
+	{
 		float mean_sum = 0;
-		for(int i=0; i<nbh_size; i++){
-			const Vector3& v =  proba_vector[nbh[i]] * _pc.row(nbh[i]);
-			mean+=v;
+		for(int i=0; i<nbh_size; i++)
+		{
+			const Vector3& v = proba_vector[nbh[i]] * _pc.row(nbh[i]);
+			mean += v;
 			mean_sum+=proba_vector[nbh[i]] ;
 		}
 		mean /= mean_sum;
 
 		float cov_sum = 0;
-		for(int i=0; i<nbh_size; i++){
-			Vector3 v =  _pc.row(nbh[i]).transpose()-mean;
-			cov+= v*v.transpose()*proba_vector[nbh[i]]*proba_vector[nbh[i]];
-			cov_sum += proba_vector[nbh[i]]*proba_vector[nbh[i]];
+		for(int i=0; i<nbh_size; i++)
+		{
+			Vector3 v =  _pc.row(nbh[i]).transpose() - mean;
+			cov += v*v.transpose()*proba_vector[nbh[i]] * proba_vector[nbh[i]];
+			cov_sum += proba_vector[nbh[i]] * proba_vector[nbh[i]];
 		}
 		cov /= cov_sum;
-	}else{
-		for(int i=0; i<nbh_size; i++){
+	}
+	else
+	{
+		for(int i=0; i<nbh_size; i++)
+		{
 			const Vector3& v =  _pc.row(nbh[i]);
-			mean+=v;
+			mean += v;
 		}
 		mean /= nbh_size;
 
-		for(int i=0; i<nbh_size; i++){
-			Vector3 v =  _pc.row(nbh[i]).transpose()-mean;
-			cov+= v*v.transpose();
+		for(int i=0; i<nbh_size; i++)
+		{
+			Vector3 v = _pc.row(nbh[i]).transpose() - mean;
+			cov += v*v.transpose();
 		}
 	}
 	
 
 	Eigen::JacobiSVD<Matrix3> svd(cov, Eigen::ComputeFullV);
-	if(compute_P){
+	if(compute_P)
+	{
 		P =  svd.matrixV().transpose();
-	}else{
+	}
+	else
+	{
 		P = P_ref;
 	}
 
@@ -440,71 +446,69 @@ EstimationTools::fillAccum(HoughAccum& hd, std::vector<long int>& nbh, int nbh_s
 	std::vector<float> sums(segNbr,0);
 	std::vector<std::vector<int> > seg_nbh(segNbr);
 	std::vector<float> cumulative_proba(segNbr);
-	if (use_aniso){
+	if (use_aniso)
+	{
 		float min_prob = 1e7;
 		float max_prob = -1e7;
-		for(int i=0; i<nbh_size; i++){
+		for(int i=0; i<nbh_size; i++)
+		{
 			if(min_prob > proba_vector[nbh[i]]) min_prob = proba_vector[nbh[i]];
 			if(max_prob < proba_vector[nbh[i]]) max_prob = proba_vector[nbh[i]];
 		}
-		if(max_prob == min_prob)
-			max_prob += 1;
-
-
+		if(max_prob == min_prob) max_prob += 1;
 		
-		for(int i=0; i<nbh_size; i++){
+		for(int i=0; i<nbh_size; i++)
+		{
 			int pos = std::min(segNbr-1, int((proba_vector[nbh[i]]-min_prob)/(max_prob-min_prob)*segNbr));
 			seg_nbh[pos].push_back(i);
 			sums[pos] += proba_vector[nbh[i]];
 		}
 
 		// create the cumulative vector
-		
 		cumulative_proba[0] = sums[0];
-		for(int i=1; i<segNbr; i++){
+		for(int i=1; i<segNbr; i++)
+		{
 			cumulative_proba[i] = sums[i] + cumulative_proba[i-1];
 		}
-		for(int i=0; i<segNbr; i++){
+		for(int i=0; i<segNbr; i++)
+		{
 			cumulative_proba[i] /= cumulative_proba[segNbr-1];
 		}
 	}
-    
-
 
 	std::vector<Vector3> accum_points;
-	for(int i=0; i<T; i++){
+	for(int i=0; i<T; i++)
+	{
 		//get a triplet of points in the neighborhood
-		std::vector<int> pt_ids(3);
+		std::vector<int> pt_ids(4);
 		do{
-			for(uint j=0; j<pt_ids.size(); j++){
-
-				
-
-				if(use_aniso){
+			for(uint j=0; j<pt_ids.size(); j++)
+			{
+				if(use_aniso)
+				{
 					// select a point
 					float pos = float(rand_ints[randPos])/RAND_MAX;
 					randPos = (randPos+1)%rand_ints.size();
 					int seg = 0;
 					for(int i=0; i<segNbr; i++)
-						if(cumulative_proba[i]>=pos){
+					{
+						if(cumulative_proba[i]>=pos)
+						{
 							seg = i;
 							break;
 						}
-
-					//seg = lower_bound(cumulative_proba.begin(), cumulative_proba.end(), pos)-cumulative_proba.begin();
-
+					}
 
 					pt_ids[j] = seg_nbh[seg][rand_ints[randPos]%seg_nbh[seg].size()];
 
 					//pt_ids[j] = rand_ints[randPos]%nbh_size();
 					randPos = (randPos+1)%rand_ints.size();
-				}else{
+				}
+				else
+				{
 					pt_ids[j] = rand_ints[randPos]%nbh_size;
 					randPos = (randPos+1)%rand_ints.size();
-
 				}
-
-                
 			}
 		}while(pt_ids[0]==pt_ids[1] || pt_ids[1]==pt_ids[2] || pt_ids[2]==pt_ids[0]);
 
@@ -520,16 +524,19 @@ EstimationTools::fillAccum(HoughAccum& hd, std::vector<long int>& nbh, int nbh_s
 	}
 
 	Matrix3 P2;
-	if(compute_P){
+	if(compute_P)
+	{
 		mean *= 0;
-		for(int i=0; i<T; i++){
+		for(int i=0; i<T; i++)
+		{
 			double c1 = std::max(0.,std::min(1-1e-8,(accum_points[i][0]+1.)/2))*A;
 			double c2 = std::max(0.,std::min(1-1e-8,(accum_points[i][1]+1.)/2))*A;
 			mean+=Vector3(c1,c2,0);
 		}
-		mean /= T;
+		mean = mean / (T*3);
 		cov*=0;
-		for(int i=0; i<T; i++){
+		for(int i=0; i<T; i++)
+		{
 			double c1 = std::max(0.,std::min(1-1e-8,(accum_points[i][0]+1.)/2))*A;
 			double c2 = std::max(0.,std::min(1-1e-8,(accum_points[i][1]+1.)/2))*A;
 			Vector3 v =  Vector3(c1,c2,0)-mean;
@@ -540,15 +547,13 @@ EstimationTools::fillAccum(HoughAccum& hd, std::vector<long int>& nbh, int nbh_s
 		P = P2*P;
 	}
 
-	for(int i=0; i<T; i++){
-
+	for(int i=0; i<T; i++)
+	{
 		Vector3& nl = accum_points[i];
 		if(compute_P)
 			nl = P2*nl; // change coordinate system
 		if(nl.dot(Vector3(0,0,1))<0) nl*=-1; //reorient normal
 		nl.normalize();//normalize
-
-
 
 		// get the position in accum
 		int c1 = std::max(0.,std::min(1-1e-8,(nl[0]+1.)/2.))*A;
@@ -567,10 +572,7 @@ EstimationTools::fillAccum(HoughAccum& hd, std::vector<long int>& nbh, int nbh_s
 
 }
 
-
 ///////////////////////////////////////////////////////////////////////////////
-
-
 
 //return the square distance to the farthest point
 double 
@@ -585,8 +587,6 @@ EstimationTools::searchKNN(const kd_tree& tree, const Vector3& pt, int K, std::v
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
-
 
 void 
 EstimationTools::sortIndicesByDistances(std::vector<long int>& indices, const std::vector<double>& distances){
