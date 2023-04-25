@@ -155,7 +155,7 @@ class normal_Est:
         # training parameter
         drop_learning_rate = 0.5
         learning_rate = 0.1
-        epoch_max = 10
+        epoch_max = 40
         decrease_step = 4
         
         # faster computation times
@@ -244,11 +244,11 @@ class normal_Est:
 
                     t.set_postfix(Bloss= error.item()/batch.size(0), loss= total_loss/count)
 
-                # save the model
-                torch.save(net.state_dict(), model_result_path)
+            # save the model
+            torch.save(net.state_dict(), model_result_path)
             print("training finished")
     
-    def est_normal(self, input_file_name, sample_num = 0):
+    def est_normal(self, input_file_name):
         
         input_file_path = "sources/meshes"
         input_file = os.path.join(input_file_path, input_file_name + ".obj")
@@ -257,13 +257,12 @@ class normal_Est:
             
         # mesh load
         input_mesh = trimesh.load(input_file)
-        input_mesh_norm = input_mesh.vertex_normals
-        input_mesh_points = input_mesh.sample(sample_num)
-        input_points = np.zeros([input_mesh.vertices.shape[0] + input_mesh_points.shape[0], 6])
-        input_points[:,:3] = np.r_[input_mesh.vertices, input_mesh_points]
-        input_points[:,:3] = self.add_gaussian_noise(input_points[:,:3])
-        input_points[:input_mesh_norm.shape[0], 3:] = input_mesh_norm
-        input_points[input_mesh_norm.shape[0]:, 3] = 100 
+        input_mesh_norm = input_mesh.vertex_normals.copy()
+        input_mesh_norm[input_mesh_norm[:, 2] < 0] = input_mesh_norm[input_mesh_norm[:, 2] < 0] * -1
+        input_points = np.zeros([input_mesh.vertices.shape[0], 6])
+        input_points[:, :3] = input_mesh.vertices.copy()
+        # input_points[:,:3] = self.add_gaussian_noise(input_points[:,:3])
+        input_points[:, 3:] = input_mesh_norm
         
         # store as .xyz file
         xyz_file_path = "sources/xyzfiles"
@@ -336,8 +335,6 @@ class normal_Est:
         # load data
         origin_points = np.loadtxt(origin_file)
         eva_points = np.loadtxt(eva_file)
-        origin_points = origin_points[origin_points[:, 3] != 100]
-        eva_points = eva_points[:origin_points.shape[0],:]
 
         # split norm point
         origin_norm = origin_points[:, 3:]
@@ -346,7 +343,7 @@ class normal_Est:
         # compute angle
         cos_theta = np.sum(origin_norm * eva_norm, axis=1) / (np.linalg.norm(origin_norm, axis=1) * np.linalg.norm(eva_norm, axis=1))
         theta = np.arccos(cos_theta)
-        theta[theta>np.pi/2] = np.pi - theta[theta>np.pi/2]
+        # theta[theta>np.pi/2] = np.pi - theta[theta>np.pi/2]
 
         # compute RMS
         RMS = np.linalg.norm(np.rad2deg(theta))/np.sqrt(theta.shape[0])
