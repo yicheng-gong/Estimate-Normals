@@ -4,6 +4,10 @@
 
 *These authors contributed to the work equllly and should be regarded as co-first authors.
 
+## Download
+If the submitted file cannnot run, you can download our project in:
+https://github.com/yicheng-gong/Estimate-Normals.git
+
 ## Run
 ### Build HoughCNN.cpp
 ```bash
