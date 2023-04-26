@@ -39,9 +39,10 @@ class NormEst{
 
 	/* ----- class member functions ----- */
 	public:
-		/** \brief Compute Ks
+		/** \brief Set Ks
 		 *
-		 * \input[in] 
+		 * \input[in] points
+		 * \input[in] Ks Value
 		 *
 		 */
 		void 
@@ -56,195 +57,211 @@ class NormEst{
 		int 
 		getKsSize() {return Ks.size();};
 
-		/** \brief Compute Ks
+		/** \brief get Ks
 		 *
-		 * \input[in] 
+		 * \input[in] points
+		 * \input[in] Ks Value
 		 *
 		 */
 		void 
 		getKs(int* array, int m);
 
-		/** \brief MoveIt function for moving arm to pick and  place an object 
+		/** \brief get density sensitive 
 		 *
-		 * \input[in] desired object  position
+		 * \input[in] none
 		 *
-		 * \return true if the action is correct
+		 * \return true if density sensitive
 		 */
 		bool 
 		getDensitySensitive() {return use_aniso;};
 
-		/** \brief Compute Ks
+		/** \brief set density sensitive 
 		 *
-		 * \input[in] 
+		 * \input[in] density sensitive
 		 *
 		 */
 		void 
 		setDensitySensitive(bool d_s) {use_aniso=d_s;};
 
-		/** \brief Compute the size of Ks 
+		/** \brief Compute the size of point cloud
 		 *
 		 * \input[in] none
 		 *
-		 * \return size of Ks
+		 * \return size of point cloud
 		 */
 		int 
 		getPCSize() {return _pc.rows();};
 
-		/** \brief Compute the size of Ks 
+		/** \brief Compute the size of point cloud 
 		 *
 		 * \input[in] none
 		 *
-		 * \return size of Ks
+		 * \return size of point cloud
 		 */
 		int 
 		getPCNormalsSize() {return _normals.rows();};
 
-		/** \brief Compute Ks
+		/** \brief initialize
 		 *
-		 * \input[in] 
+		 * \input[in] none
 		 *
 		 */
 		void 
 		initialize();
 
-		/** \brief Compute Ks
+		/** \brief get batch
 		 *
-		 * \input[in] 
+		 * \input[in] batch id
+		 * \input[in] batch size
+		 * \input[in] points
 		 *
 		 */
 		void 
 		getBatch(int batch_id, int batch_size, double* array);
 
-		/** \brief Compute Ks
+		/** \brief set batch
 		 *
-		 * \input[in] 
+		 * \input[in] batch id
+		 * \input[in] batch size
+		 * \input[in] points 
 		 *
 		 */
 		void 
 		setBatch(int batch_id, int batch_size, double* array);
 
-		/** \brief Compute Ks
+		/** \brief set T
 		 *
-		 * \input[in] 
+		 * \input[in] input T
 		 *
 		 */
 		void 
 		setT(int T_) {T=T_;};
 
-		/** \brief Compute Ks
+		/** \brief set Kaniso
 		 *
-		 * \input[in] 
+		 * \input[in] Kaniso
 		 *
 		 */
 		void 
 		setKaniso(int Kaniso) {K_aniso=Kaniso;};
 
-		/** \brief Compute Ks
+		/** \brief set A
 		 *
-		 * \input[in] 
+		 * \input[in] input A
 		 *
 		 */
 		void 
 		setA(int A_){A = A_;}
 
-		/** \brief Compute the size of Ks 
+		/** \brief get T
 		 *
 		 * \input[in] none
 		 *
-		 * \return size of Ks
+		 * \return T
 		 */
 		const int 
 		getT()const {return T;}
 
-        /** \brief Compute the size of Ks 
+        /** \brief get Kaniso 
 		 *
 		 * \input[in] none
 		 *
-		 * \return size of Ks
+		 * \return Kaniso
 		 */
 		const int 
 		getKaniso() const {return K_aniso;}
 
-		/** \brief Compute the size of Ks 
+		/** \brief get A 
 		 *
 		 * \input[in] none
 		 *
-		 * \return size of Ks
+		 * \return A
 		 */
 		const int 
 		getA() const{return A;}
 
-		/** \brief Compute Ks
+		/** \brief get points
 		 *
-		 * \input[in] 
+		 * \input[in] points
+		 * \input[in] row
+		 * \input[in] column
 		 *
 		 */
 		void 
 		getPoints(double* array, int m, int n);
 
-		/** \brief Compute Ks
+		/** \brief get normals
 		 *
-		 * \input[in] 
+		 * \input[in] points
+		 * \input[in] row
+		 * \input[in] column
 		 *
 		 */
 		void 
 		getNormals(double* array, int m, int n);
 
-		/** \brief Compute Ks
+		/** \brief set points
 		 *
-		 * \input[in] 
+		 * \input[in] points
+		 * \input[in] row
+		 * \input[in] column
 		 *
 		 */
 		void 
 		setPoints(double* array, int m, int n);
 
-		/** \brief Compute Ks
+		/** \brief set normals
 		 *
-		 * \input[in] 
+		 * \input[in] points
+		 * \input[in] row
+		 * \input[in] column
 		 *
 		 */
 		void 
 		setNormals(double* array, int m, int n);
 
-		/** \brief Compute the size of Ks 
+		/** \brief point cloud matrix
 		 *
 		 * \input[in] none
 		 *
-		 * \return size of Ks
+		 * \return matrix of point cloud
 		 */
 		const MatrixX3& 
 		pc() const{return _pc;}
 
-        /** \brief Compute the size of Ks 
+        /** \brief normal matrix
 		 *
 		 * \input[in] none
 		 *
-		 * \return size of Ks
+		 * \return normals
 		 */
 		MatrixX3& 
 		normals(){return _normals;}
 
-		/** \brief Compute the size of Ks 
+		/** \brief generate train data
 		 *
-		 * \input[in] none
+		 * \input[in] noise level
+		 * \input[in] number points
+		 * \input[in] points
+		 * \input[in] batch size
 		 *
-		 * \return size of Ks
+		 * \return training data
 		 */
 		int 
 		generateTrainAccRandomCorner(int noise_val, int n_points, double* array, double* array_gt);
 		
-		/** \brief Compute Ks
+		/** \brief load .xyz file
 		 *
-		 * \input[in] 
+		 * \input[in] file name
 		 *
 		 */
 		void 
 		loadXYZ(const std::string& filename);
 
 		
-		/** \brief Compute Ks
+		/** \brief save .xyz file
 		 *
-		 * \input[in] 
+		 * \input[in] file name
 		 *
 		 */
 		void 
@@ -286,8 +303,6 @@ class NormEst{
 		unsigned int randPos;
 		std::vector<HoughAccum> accums;
 		std::vector<unsigned int> rand_ints;
-
-
 };
 
 class EstimationTools{
@@ -311,11 +326,7 @@ class EstimationTools{
 		void addGaussianNoise(Eigen::MatrixX3d& pc, double sigma);
 
 		void addGaussianNoisePercentage(Eigen::MatrixX3d& pc, int percentage);
-
-		VectorX gaussianBlur(VectorX& accum, int kernelSize, float sigma, int A = 33);
 };
-
-
 
 
 #endif

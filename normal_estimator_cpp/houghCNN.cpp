@@ -566,7 +566,6 @@ EstimationTools::fillAccum(HoughAccum& hd, std::vector<long int>& nbh, int nbh_s
 		accum_vec.row(pos) += nl;
 	}
 
-	//accum = gaussianBlur(accum,5,1);
 	//renorm patch
 	accum /= accum.maxCoeff();
 
@@ -811,49 +810,3 @@ EstimationTools::addGaussianNoisePercentage(Eigen::MatrixX3d& pc, int percentage
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-
-VectorX 
-EstimationTools::gaussianBlur(VectorX& accum, int kernelSize, float sigma, int A) {
-
-    MatrixX accum_matrix = Eigen::Map<const MatrixX>(accum.data(), A, A);
-
-    // create guassian kernal
-    Eigen::MatrixXd kernel(kernelSize, kernelSize);
-    int halfKernelSize = kernelSize / 2;
-    for (int i = -halfKernelSize; i <= halfKernelSize; ++i) {
-        for (int j = -halfKernelSize; j <= halfKernelSize; ++j) {
-            float x = i * i;
-            float y = j * j;
-            float exponent = -(x + y) / (2 * sigma * sigma);
-            float value = exp(exponent) / (2 * M_PI * sigma * sigma);
-            kernel(i + halfKernelSize,j + halfKernelSize) = value;
-        }
-    }
-
-    // normalize guassian kernal
-    for (int i = 0; i < kernelSize; ++i) {
-        for (int j = 0; j < kernelSize; ++j) {
-            kernel(i,j) = kernel(i,j) / kernel.sum();
-        }
-    }
-
-	MatrixX result (A, A);
-	for (int row = 0; row < A; ++row) {
-        for (int col = 0; col < A; ++col) {
-            for (int i = -halfKernelSize; i <= halfKernelSize; ++i) {
-                for (int j = -halfKernelSize; j <= halfKernelSize; ++j) {
-                    int newRow = row + i;
-                    int newCol = col + j;
-                    if (newRow >= 0 && newRow < A && newCol >= 0 && newCol < A) {
-                        result(row,col) += accum_matrix(newRow,newCol) * kernel(i + halfKernelSize,j + halfKernelSize);
-                    }
-                }
-            }
-        }
-    }
-
-	VectorX filtered_accum = Eigen::Map<const VectorX>(result.data(), result.size());
-
-	return filtered_accum;
-}
-

@@ -62,8 +62,7 @@ class BasicBlock(nn. Module):
 
         return x
 
-def make_layer(out_channels, num_blocks, stride):
-    in_channels = 50
+def make_layer(in_channels, out_channels, num_blocks, stride=1):
     strides = [stride] + [1] * (num_blocks - 1)
     layers = []
     for stride in strides:
@@ -77,22 +76,23 @@ def create_model():
         nn.Conv2d(3, 50, kernel_size=3),
         nn.BatchNorm2d(50),
         nn.ReLU(inplace=True),
-        make_layer(50, 2, stride=1),
-        make_layer(50, 2, stride=2),
-        make_layer(50, 2, stride=2),
-        make_layer(50, 2, stride=2),
+        make_layer(50, 64, 2, stride=1),
+        make_layer(64, 128, 2, stride=2),
+        make_layer(128, 256, 2, stride=2),
+        make_layer(256, 512, 2, stride=2),
+        nn.MaxPool2d((2, 2),(2, 2)),
         Lambda(lambda x: x.view(x.size(0),-1)), # View,
         nn.Sequential( # Sequential,
     		nn.Dropout(0.5),
-    		nn.Sequential(Lambda(lambda x: x.view(1,-1) if 1==len(x.size()) else x ),nn.Linear(800,256)), # Linear,
+    		nn.Sequential(Lambda(lambda x: x.view(1,-1) if 1==len(x.size()) else x ),nn.Linear(2048,512)), # Linear,
+    		nn.ReLU(),
+    		nn.Dropout(0.5),
+    		nn.Sequential(Lambda(lambda x: x.view(1,-1) if 1==len(x.size()) else x ),nn.Linear(512,256)), # Linear,
     		nn.ReLU(),
     		nn.Dropout(0.5),
     		nn.Sequential(Lambda(lambda x: x.view(1,-1) if 1==len(x.size()) else x ),nn.Linear(256,128)), # Linear,
     		nn.ReLU(),
-    		nn.Dropout(0.5),
-    		nn.Sequential(Lambda(lambda x: x.view(1,-1) if 1==len(x.size()) else x ),nn.Linear(128,64)), # Linear,
-    		nn.ReLU(),
-    		nn.Sequential(Lambda(lambda x: x.view(1,-1) if 1==len(x.size()) else x ),nn.Linear(64,2)), # Linear,
+    		nn.Sequential(Lambda(lambda x: x.view(1,-1) if 1==len(x.size()) else x ),nn.Linear(128,2)), # Linear,
     	),
     )
     return model

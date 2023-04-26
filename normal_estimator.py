@@ -12,6 +12,7 @@ import trimesh
 import scipy
 import matplotlib.pyplot as plt
 import pickle
+from sklearn.neighbors import KDTree
 
 class normal_Est:
     
@@ -24,6 +25,8 @@ class normal_Est:
     density_sensitive = False
     use_ResNet = False
     set_dataset_size = 100000
+    set_epoch_max = 40
+    set_learning_rate = 0.1
     
     # choose device
     if torch.cuda.is_available():
@@ -45,6 +48,8 @@ class normal_Est:
         self.density_sensitive = False
         self.use_ResNet = False
         self.set_dataset_size = 100000
+        self.set_epoch_max = 40
+        self.set_learning_rate = 0.1
         
     def dataset_create(self, dataset_path, estimator):
         print("creating dataset")
@@ -145,7 +150,9 @@ class normal_Est:
     def add_gaussian_noise(self, points):
         # points: numpy array with shape (N, 3), representing a point cloud
 
-        mean_distance = np.linalg.norm(np.mean(points,axis = 0))
+        tree = KDTree(points)
+        distances, _ = tree.query(points, k=2)
+        mean_distance = np.mean(distances[:, 1])
         std = self.set_noise_scale * mean_distance
         noise = np.random.normal(0,std,points.shape)
         noisy_points = points + noise
@@ -154,8 +161,6 @@ class normal_Est:
     def model_training(self): 
         # training parameter
         drop_learning_rate = 0.5
-        learning_rate = 0.1
-        epoch_max = 40
         decrease_step = 4
         
         # faster computation times
@@ -201,7 +206,7 @@ class normal_Est:
             # create optimizer
             print("Creating optimizer")
             criterion = nn.MSELoss()
-            optimizer = optim.SGD(net.parameters(), lr=learning_rate, weight_decay=5e-4, momentum=0.9)
+            optimizer = optim.SGD(net.parameters(), lr=self.set_learning_rate, weight_decay=5e-4, momentum=0.9)
             
             # apply in gpu
             if self.USE_CUDA:
@@ -210,12 +215,12 @@ class normal_Est:
             
             # start train
             print("Training")
-            for epoch in range(epoch_max):
+            for epoch in range(self.set_epoch_max):
 
                 if(epoch%decrease_step==0 and epoch>0):
-                    learning_rate *= drop_learning_rate
+                    self.set_learning_rate *= drop_learning_rate
                     for param_group in optimizer.param_groups:
-                        param_group['lr'] = learning_rate
+                        param_group['lr'] = self.set_learning_rate
 
                 total_loss = 0
                 count = 0
@@ -258,10 +263,9 @@ class normal_Est:
         # mesh load
         input_mesh = trimesh.load(input_file)
         input_mesh_norm = input_mesh.vertex_normals.copy()
-        input_mesh_norm[input_mesh_norm[:, 2] < 0] = input_mesh_norm[input_mesh_norm[:, 2] < 0] * -1
         input_points = np.zeros([input_mesh.vertices.shape[0], 6])
         input_points[:, :3] = input_mesh.vertices.copy()
-        # input_points[:,:3] = self.add_gaussian_noise(input_points[:,:3])
+        input_points[:, :3] = self.add_gaussian_noise(input_points[:,:3])
         input_points[:, 3:] = input_mesh_norm
         
         # store as .xyz file
@@ -343,7 +347,10 @@ class normal_Est:
         # compute angle
         cos_theta = np.sum(origin_norm * eva_norm, axis=1) / (np.linalg.norm(origin_norm, axis=1) * np.linalg.norm(eva_norm, axis=1))
         theta = np.arccos(cos_theta)
-        theta[theta>np.pi/2] = np.pi - theta[theta>np.pi/2]
+        for i in range(theta.shape[0]):
+            if theta[i] > np.pi/2:
+                cos_theta = np.sum(-1 * origin_norm[i, :] * eva_norm[i, :]) / (np.linalg.norm(origin_norm[i, :]) * np.linalg.norm(eva_norm[i, :]))
+                theta[i] = np.arccos(cos_theta)
 
         # compute RMS
         RMS = np.linalg.norm(np.rad2deg(theta))/np.sqrt(theta.shape[0])
