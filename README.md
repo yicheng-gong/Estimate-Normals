@@ -18,6 +18,8 @@ https://github.com/yicheng-gong/Estimate-Normals.git
 ### Run Normal Estimator
 main.ipynb
 
+## Acknowledgement
+https://github.com/aboulch/normals_HoughCNN.git
 
 ## License
 LICENSE: MIT.  See LICENSE
